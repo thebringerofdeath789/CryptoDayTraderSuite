@@ -1,7 +1,0 @@
-﻿Provider Public API Probe
-GeneratedUtc: 2026-02-17T09:34:59.0348506Z
-Verdict: FAIL
-Assembly: C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify\CryptoDayTraderSuite.exe
-
-- [FAIL] Coinbase | create=True discover=True ticker=False spot=True perp=True symbol=BTC-USD products=789 (spot=786,perp=3) lat(ms)=233/0 error=The DateTimeStyles value RoundtripKind cannot be used with the values AssumeLocal, AssumeUniversal or AdjustToUniversal.
-Parameter name: styles failureClass=INTEGRATION-ERROR
