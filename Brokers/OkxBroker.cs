@@ -61,7 +61,7 @@ namespace CryptoDayTraderSuite.Brokers
                 var normalizedSymbol = NormalizeOkxSymbol(plan.Symbol);
                 if (string.IsNullOrWhiteSpace(normalizedSymbol))
                 {
-                    return (false, "symbol is invalid after normalization");
+                    return (false, BuildFailureMessage("validation", null, "symbol is invalid after normalization"));
                 }
 
                 var constraints = await client.GetSymbolConstraintsAsync(normalizedSymbol).ConfigureAwait(false);
@@ -72,13 +72,13 @@ namespace CryptoDayTraderSuite.Brokers
 
                 if (constraints.StepSize > 0m)
                 {
-                    var alignedQty = AlignDownToStep(plan.Qty, constraints.StepSize);
+                    var alignedQty = BrokerPrecision.AlignDownToStep(plan.Qty, constraints.StepSize);
                     if (alignedQty <= 0m)
                     {
                         return (false, "quantity rounds below minimum step size");
                     }
 
-                    if (alignedQty != plan.Qty)
+                    if (!BrokerPrecision.IsAlignedToStep(plan.Qty, constraints.StepSize))
                     {
                         return (false, "quantity does not align with symbol step size");
                     }
@@ -96,17 +96,17 @@ namespace CryptoDayTraderSuite.Brokers
 
                 if (constraints.PriceTickSize > 0m)
                 {
-                    if (!IsAlignedToStep(plan.Entry, constraints.PriceTickSize))
+                    if (!BrokerPrecision.IsAlignedToStep(plan.Entry, constraints.PriceTickSize))
                     {
                         return (false, "entry does not align with symbol price tick");
                     }
 
-                    if (!IsAlignedToStep(plan.Stop, constraints.PriceTickSize))
+                    if (!BrokerPrecision.IsAlignedToStep(plan.Stop, constraints.PriceTickSize))
                     {
                         return (false, "stop does not align with symbol price tick");
                     }
 
-                    if (!IsAlignedToStep(plan.Target, constraints.PriceTickSize))
+                    if (!BrokerPrecision.IsAlignedToStep(plan.Target, constraints.PriceTickSize))
                     {
                         return (false, "target does not align with symbol price tick");
                     }
@@ -121,7 +121,7 @@ namespace CryptoDayTraderSuite.Brokers
             catch (Exception ex)
             {
                 Log.Warn("[OkxBroker] Constraint validation failed: " + ex.Message);
-                return (false, "unable to validate symbol constraints");
+                return (false, BuildFailureMessage("constraints", ex.Message, "unable to validate symbol constraints"));
             }
 
             return (true, "ok");
@@ -138,7 +138,7 @@ namespace CryptoDayTraderSuite.Brokers
                 var normalizedSymbol = NormalizeOkxSymbol(plan.Symbol);
                 if (string.IsNullOrWhiteSpace(normalizedSymbol))
                 {
-                    return (false, "symbol is invalid after normalization");
+                    return (false, BuildFailureMessage("validation", null, "symbol is invalid after normalization"));
                 }
 
                 var order = new OrderRequest
@@ -152,15 +152,15 @@ namespace CryptoDayTraderSuite.Brokers
                 };
 
                 var result = await client.PlaceOrderAsync(order).ConfigureAwait(false);
-                if (result == null) return (false, "empty order result");
-                if (!result.Accepted) return (false, string.IsNullOrWhiteSpace(result.Message) ? "order rejected" : result.Message);
+                if (result == null) return (false, BuildFailureMessage("place", null, "empty order result"));
+                if (!result.Accepted) return (false, BuildFailureMessage("rejected", result.Message, "order rejected"));
 
-                return (true, "accepted order=" + (result.OrderId ?? "(unknown)"));
+                return (true, BuildSuccessMessage("accepted", "order=" + (result.OrderId ?? "(unknown)")));
             }
             catch (Exception ex)
             {
                 Log.Error("okx place failed: " + ex.Message, ex);
-                return (false, ex.Message);
+                return (false, BuildFailureMessage("place", ex.Message, "place failed"));
             }
         }
 
@@ -168,18 +168,33 @@ namespace CryptoDayTraderSuite.Brokers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(symbol)) return (false, "symbol required for okx cancel-all");
+                if (string.IsNullOrWhiteSpace(symbol)) return (false, BuildFailureMessage("validation", null, "symbol required for okx cancel-all"));
                 var normalizedSymbol = NormalizeOkxSymbol(symbol);
-                if (string.IsNullOrWhiteSpace(normalizedSymbol)) return (false, "symbol is invalid after normalization");
+                if (string.IsNullOrWhiteSpace(normalizedSymbol)) return (false, BuildFailureMessage("validation", null, "symbol is invalid after normalization"));
                 var client = CreateClient(null);
                 var ok = await client.CancelAllOpenOrdersAsync(normalizedSymbol).ConfigureAwait(false);
-                return ok ? (true, "canceled open orders") : (false, "cancel-all failed");
+                return ok ? (true, BuildSuccessMessage("canceled", "canceled open orders")) : (false, BuildFailureMessage("cancel", null, "cancel-all failed"));
             }
             catch (Exception ex)
             {
                 Log.Error("okx cancel failed: " + ex.Message, ex);
-                return (false, ex.Message);
+                return (false, BuildFailureMessage("cancel", ex.Message, "cancel failed"));
             }
+        }
+        private string BuildSuccessMessage(string category, string detail)
+        {
+            var normalizedCategory = string.IsNullOrWhiteSpace(category) ? "ok" : category.Trim().ToLowerInvariant();
+            var body = string.IsNullOrWhiteSpace(detail) ? "ok" : detail.Trim();
+            if (body.Length > 220) body = body.Substring(0, 220) + "...";
+            return normalizedCategory + ": " + body;
+        }
+
+        private string BuildFailureMessage(string category, string detail, string fallback)
+        {
+            var normalizedCategory = string.IsNullOrWhiteSpace(category) ? "error" : category.Trim().ToLowerInvariant();
+            var body = string.IsNullOrWhiteSpace(detail) ? (fallback ?? "error") : detail.Trim();
+            if (body.Length > 220) body = body.Substring(0, 220) + "...";
+            return normalizedCategory + ": " + body;
         }
 
         private string NormalizeOkxSymbol(string symbol)
@@ -245,31 +260,9 @@ namespace CryptoDayTraderSuite.Brokers
             return string.IsNullOrWhiteSpace(decrypted) ? value : decrypted;
         }
 
-        private decimal AlignDownToStep(decimal quantity, decimal stepSize)
-        {
-            if (quantity <= 0m || stepSize <= 0m)
-            {
-                return 0m;
-            }
-
-            var steps = Math.Floor(quantity / stepSize);
-            var aligned = stepSize * steps;
-            if (aligned < 0m)
-            {
-                return 0m;
-            }
-
-            return aligned;
-        }
-
-        private bool IsAlignedToStep(decimal value, decimal stepSize)
-        {
-            if (value <= 0m || stepSize <= 0m)
-            {
-                return false;
-            }
-
-            return AlignDownToStep(value, stepSize) == value;
-        }
     }
 }
+
+
+
+

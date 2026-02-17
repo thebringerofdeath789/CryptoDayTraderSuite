@@ -507,4 +507,26 @@ Goal: move from single-venue execution to multi-venue edge capture by combining 
 	- [ ] Audit `UI/PlannerControl.cs` for pre-trade gating and broker capability enforcement parity.
 	- [ ] Audit `MainForm.cs` and `Program.cs` for composition-root DI integrity and duplicate execution-surface drift.
 
+### Phase X Consolidated Backlog (BUG-101 to BUG-117)
+- [ ] **Wave 1 - Critical Execution Safety (Must Fix First)**
+	- [ ] **BUG-101**: Add account-scoped cancel contract and remove active-key fallback ambiguity in broker cancel-all flows.
+	- [ ] **BUG-109**: Pass actual runtime/global bias into strategy-policy evaluation (remove hardcoded neutral bias in planner policy gate).
+	- [ ] **BUG-114**: Retire or hard-gate legacy `MainForm` live submit path so live execution always routes through broker capability/live-arm protections.
+- [ ] **Wave 2 - Major Runtime Integrity**
+	- [ ] **BUG-105**: Partition symbol-constraint caches by venue base-url/context to prevent cross-region contamination.
+	- [ ] **BUG-106**: Replace Kraken hardcoded product list with live discovery.
+	- [ ] **BUG-107**: Replace culture-sensitive decimal conversion in Bitstamp client with invariant parse guards.
+	- [ ] **BUG-110**: Convert AI review exception path to deterministic fail-closed policy (or explicit operator-ack mode).
+	- [ ] **BUG-111**: Add active-key fallback path in buying-power resolution when `Account.KeyEntryId` is blank.
+	- [ ] **BUG-112**: Add synchronization around `ExchangeProvider` authenticated client cache.
+	- [ ] **BUG-115**: Unify Planner vs Auto protective-exit policy behavior.
+	- [ ] **BUG-116**: Unify key-resolution semantics in Auto Mode pre-gates with broker/service key fallback behavior.
+	- [ ] **BUG-117**: Remove hardcoded Coinbase public-client wiring for Planner/Auto initialization and route by selected account/service context.
+- [ ] **Wave 3 - Contract/Docs/Observability Closure**
+	- [ ] **BUG-102**: Trim/normalize broker service input in factory routing.
+	- [ ] **BUG-103**: Add Binance alias active-key fallback parity (`binance`/`binance-us`/`binance-global`).
+	- [ ] **BUG-104**: Update broker docs to match actual async interface/factory source.
+	- [ ] **BUG-108**: Align exchange abstraction contract with runtime requirements (balances/constraints/cancel-all capability surface).
+	- [ ] **BUG-113**: Add malformed-row telemetry in history parsing (retain continuity but make drops observable).
+
 

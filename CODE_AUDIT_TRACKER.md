@@ -460,3 +460,57 @@
 - Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_155903.txt` => `VERDICT=PARTIAL`.
 - Strict telemetry remains clean: `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
 - Fresh strict rerun artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_160427.txt` => `VERDICT=PARTIAL`, `StrictFailureClass=NONE`, `StrictFailures=count=0`.
+
+## Post-Audit Remediation (Iteration 6) - 2026-02-17
+
+### R6 Changes Applied
+
+- Hardened precision alignment checks in broker validation paths to reduce false rejects from decimal precision artifacts:
+  - updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, `Brokers/OkxBroker.cs`.
+  - replaced strict equality-based step alignment (`aligned == value`) with tolerance-based alignment checks.
+  - switched step-size quantity validation from direct `alignedQty != plan.Qty` comparison to `IsAlignedToStep(plan.Qty, constraints.StepSize)`.
+
+### R6 Finding Status Updates
+
+- `BUG-CORRECTNESS-PRECISIONALIGN-001`: **Closed** (cross-broker numeric alignment checks now precision-tolerant while remaining fail-closed).
+
+### R6 Verification
+
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+
+## Post-Audit Remediation (Iteration 7) - 2026-02-17
+
+### R7 Changes Applied
+
+- Consolidated duplicated broker precision logic into new shared helper `Brokers/BrokerPrecision.cs`.
+- Refactored `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` to call shared `BrokerPrecision.AlignDownToStep(...)` and `BrokerPrecision.IsAlignedToStep(...)`.
+- Removed per-broker duplicate tolerance/precision helper implementations and added `Brokers/BrokerPrecision.cs` to `CryptoDayTraderSuite.csproj` compile includes.
+
+### R7 Finding Status Updates
+
+- `TECHDEBT-DUPLICATED-VALIDATION-MATH-001`: **Closed** (single shared precision implementation now used across active exchange brokers).
+
+### R7 Verification
+
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_182953.txt` => `VERDICT=PARTIAL`, `StrictFailureClass=NONE`, `StrictFailures=count=0`, `StrictPolicyDecision=allow-geo-partial`.
+
+## Post-Audit Remediation (Iteration 8) - 2026-02-17
+
+### R8 Changes Applied
+
+- Fixed cross-broker place-path failure categorization drift in formatted return messages:
+  - `Brokers/BinanceBroker.cs`
+  - `Brokers/BybitBroker.cs`
+  - `Brokers/CoinbaseExchangeBroker.cs`
+  - `Brokers/OkxBroker.cs`
+- `PlaceOrderAsync(...)` exception paths now emit `BuildFailureMessage("place", ..., "place failed")` (previously mislabeled as `cancel`).
+
+### R8 Finding Status Updates
+
+- `BUG-OBSERVABILITY-FAILURECATEGORY-001`: **Closed** (place-flow failures are now categorized correctly across active exchange brokers).
+
+### R8 Verification
+
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_183610.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_POLICY_DECISION=allow-geo-partial`.

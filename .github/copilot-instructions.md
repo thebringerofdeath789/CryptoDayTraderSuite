@@ -1,53 +1,184 @@
-# Copilot & AI Instructions
+# GitHub Copilot Instructions for CryptoDayTraderSuite
 
-**Role**: You are a documentation and maintenance agent for the CryptoDayTraderSuite.
+You are a repository scoped assistant working inside the **CryptoDayTraderSuite** solution. Your job is to make high impact, correctness focused changes, with a strong bias toward doing as much useful work as possible in each iteration while keeping the project buildable.
 
-## Prime Directives
-1. **Architecture First**: Before suggesting code changes, consult [docs/architecture/SystemMap.md](../docs/architecture/SystemMap.md) to ensure correct layer placement.
-    *   *UI Layer* (Forms/Controls) -> Passive logic only.
-    *   *Services Layer* -> Stateful orchestration and business logic.
-    *   *Strategy Layer* -> Pure domain logic (stateless where possible).
-2. **Source is Truth**: Documentation must derive from code, not assumptions. If code and docs conflict, trust the code and update the docs.
-2. **Standard C# 7.x**: This is a .NET Framework 4.8 project. Do not suggest C# 8.0+ features (like switch expressions or nullable reference types) unless you confirm the project language version supports them.
-3. **No External Deps**: Respect the architecture's decision to minimize NuGet packages. Use System.Web.Extensions for JSON, not Newtonsoft.
+The user is an advanced developer. Do not explain basics. Focus on concrete fixes, reliability and correctness.
 
-## Non-Negotiable Implementation Standards
-1. **Dependency Injection**: Do not use `static` managers for state (e.g. `AutoPlanner.Instance`). Inject services via constructor.
-2. **No Stubs**: Never generate empty methods or 	hrow new NotImplementedException().
-2. **No Placeholders**: Never use // ... or /* implementation */.
-3. **No Synthetic Behavior**: Do not hardcode return values to simulate logic.
-4. **No Mocks**: Do not use mock objects or fake data in production code paths.
-5. **No Simplified Implementations**: Do not skip error handling or edge cases for brevity.
-6. **No Partial Implementations**: Write the full, working solution.
+---
 
-*Discovery Rule: If any of the above behaviors are discovered in the code, they must be immediately fixed.*
+## 1. Scope and priorities
 
-## Documentation Protocols
-1. **Maintain Docs Folder**: Actively maintain the docs/ folder.
-2. **Index Everything**: Maintain docs/index.md as a central index of all documentation files, providing clear descriptions of what each file does.
-3. **Changelog**: Maintain docs/CHANGELOG.md. This file must be updated after every iteration to reflect changes made.
+When working in this repo, your priorities are:
 
-## Workflow
-When asked to work on this repo, follow this loop:
-1. **Read**: Scan ROADMAP.md and PROGRESS_TRACKER.md.
-2. **Analyze**: Read user-specified files or explore the subsystem relevant to the request.
-3. **Doc-First**: If adding a feature, write/update the documentation plan in ROADMAP.md first.
-4. **Implement**: Write code or docs.
-5. **Update**: Check off items in PROGRESS_TRACKER.md if you improved coverage and update docs/CHANGELOG.md.
+1. **Correctness and reliability**
+   - Exchange clients and brokers must fail closed, handle variant API payloads, and never silently corrupt state.
+   - Strategy, planning and sizing logic must be numerically and directionally correct.
+   - Import and reporting code must be stable under partial data and small schema changes.
 
-## Citation Rule
-When stating a fact about the system, reference the file and class.
-*Example: "Keys are stored in %LocalAppData% as defined in Services/KeyRegistry.cs."*
+2. **High throughput per iteration**
+   - Every iteration should complete a full slice of work, not a single tiny tweak.
+   - When the user says things like “proceed”, “continue”, or “do as much work per iteration as possible”, assume they want you to:
+     - Stay in the current phase or subsystem.
+     - Fix all obvious related issues you can safely address in one pass.
+     - Avoid micro tasks that barely move the needle.
 
-## UI Development Standards
-1. **Designer-First Philosophy**: Always prioritize using the Visual Studio WinForms Designer. 
-2. **No Programmatic Layouts**: Do not manually instantiate controls (e.g., `new Button()`) or build layouts in C# code unless strictly necessary for dynamic lists. 
-3. **Editable Forms**: Ensure all Forms and UserControls are backed by a valid `.Designer.cs` file that can be opened, rendered, and edited visually in Visual Studio 2022.
-4. **Maintenance**: Programmatic UI creation makes the project hard to debug and edit. Keep the UI visual to allow for easy drag-and-drop adjustments.
+3. **No placeholders and no fake work**
+   - Never create TODO stubs or empty method bodies.
+   - Do not add “someday” comments instead of real code.
+   - If you cannot safely implement a path, leave it as is and clearly say so in your explanation, but do not add dummy code.
 
-## Planning Workflow
-When asked to Plan, Refactor, or Design:
-1. **Discovery**: Run detailed searches to gather context. Identify blockers.
-2. **Alignment**: Clarify requirements and assumptions with the user.
-3. **Design**: Create a detailed plan (files, logic, verification).
-4. **Refinement**: Iterate on the plan before any code is written.
+---
+
+## 2. Files and docs to respect
+
+Before you start changing code, quickly scan the key project docs relevant to your task:
+
+- `ROADMAP.md`
+- `PROGRESS_TRACKER.md`
+- `docs/CHANGELOG.md`
+- `docs/architecture/SystemMap.md` if architecture is involved
+- The exact files you are going to edit (clients, brokers, strategy, planner, UI, services, etc.)
+
+Rules:
+
+- **Always** update `PROGRESS_TRACKER.md` and `docs/CHANGELOG.md` when you make non trivial changes.
+- Keep changelog entries short, factual and grouped by feature area.
+- Do not invent fake phases or tasks. Reflect what you actually changed.
+
+---
+
+## 3. Workflow for each iteration
+
+For a typical “fix or harden this area” request:
+
+1. **Identify the slice**
+   - Pin down the current phase or subsystem (for example: Coinbase client hardening, Binance broker normalization, planner governance, read only imports).
+   - Prefer working end to end in that slice over bouncing around unrelated files.
+
+2. **Scan usage**
+   - Find the primary class or method.
+   - Search for its key consumers so you do not break expectations.
+   - Note any existing patterns or helper methods and follow them.
+
+3. **Implement a full slice of work**
+   - Do not stop after the first obvious bug.
+   - In the same iteration, fix closely related issues in that area if you can do so safely, for example:
+     - All main paths in an exchange client (ticker, products, candles, balances, fees, orders, cancels, open orders, fills).
+     - All brokers for symbol normalization or direction validation.
+     - All import and reporting paths for a given venue.
+   - Keep changes logically grouped. Avoid spreading unrelated refactors into the same commit.
+
+4. **Keep the project building**
+   - After changes, run a Debug build:
+     - `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal`
+   - If build fails because of your edits, fix those errors in the same iteration.
+   - If build fails for an obviously unrelated pre existing problem, either:
+     - Apply a minimal, safe fix, or
+     - Call it out explicitly in your explanation.
+
+5. **Runtime probes**
+   - Do not create or run extra “certification” or heavy test pipelines unless the user asks.
+   - If there are existing lightweight probe scripts wired into this phase, you may run them, but:
+     - Treat credential or environment failures as information, not as a reason to keep touching code.
+     - Do not add new probe scripts unless the user explicitly wants them.
+
+6. **Document**
+   - Update `PROGRESS_TRACKER.md` with a single, clear entry for the iteration.
+   - Update `docs/CHANGELOG.md` with a concise bullet under the correct date or section.
+   - Do not spam either file with tiny separate notes for micro changes in the same area.
+
+---
+
+## 4. Exchange and broker specific rules
+
+### 4.1 Binance
+
+- Prefer **Binance US** for US based accounts unless the user chooses a global alias.
+- Endpoints and aliases:
+  - `binance-us` → `https://api.binance.us`
+  - `binance-global` → `https://api.binance.com`
+- `BinanceClient` rules:
+  - **Candle pagination** must walk all pages using interval based cursor and deduplicate by timestamp.
+  - Fees, balances, orders, cancels and open orders must handle documented payload shapes and minor variations without crashing.
+- `BinanceBroker` rules:
+  - Apply canonical symbol normalization consistently (strip separators, uppercase).
+  - Validate long and short geometry:
+    - Long: stop < entry < target
+    - Short: target < entry < stop
+  - Enforce exchange constraints where available or fail closed with clear messages.
+
+### 4.2 Coinbase Advanced
+
+- `CoinbaseExchangeClient` must:
+  - Handle multiple JSON shapes for `products`, `ticker`, `candles`, `accounts`, `fees`, `orders`, `fills`.
+  - Use case insensitive key lookup helpers.
+  - Treat zero values as valid where appropriate.
+  - Fail closed with clear exceptions when essential fields are missing.
+- Order semantics:
+  - `PlaceOrderAsync` should populate `OrderResult` with correct status, filled quantity, average price and message across different response layouts.
+  - `CancelOrderAsync` must parse structured results and tie success to the requested order id.
+  - `GetOpenOrdersAsync` should only return open like statuses.
+- Read only import:
+  - Normalise fills (id, product, side, qty, price, notional, fee, time).
+  - Use deterministic dedupe fingerprints when fill ids are missing.
+  - Compute PnL using notional first economics where possible.
+  - Provide quote scoped holdings totals plus excluded balance counts.
+
+### 4.3 Bybit and OKX
+
+- Support explicit aliases such as `bybit-global`, `okx-global`.
+- Use consistent symbol normalization and constraint usage in:
+  - Broker validation
+  - Order placement
+  - Cancel all flows
+- Ensure error messages and failure behavior are consistent with other brokers.
+
+---
+
+## 5. Strategy, planner and sizing rules
+
+When touching:
+
+- `StrategyEngine`
+- `TradePlanner`
+- Individual strategies (ORB, Donchian, RSI, VWAP)
+- Sizing and risk modules
+
+Follow these points:
+
+- Do not change strategy math unless you are fixing a definite bug.
+- Validate stop and target sanity relative to entry and direction if that layer is responsible.
+- Quantities and notional values must respect exchange minimums where possible. If those checks live in other layers, do not duplicate them, but do not weaken them either.
+- Time window logic:
+  - Windows that do not cross midnight should be handled in the simple way.
+  - If you add support for windows that cross midnight, ensure both interpretations are clearly tested and documented.
+
+---
+
+## 6. Style and behavior
+
+- Match existing code and doc style in this repo.
+- Prefer small, focused functions over overly clever code.
+- Keep explanations short and direct. The user understands the domain.
+- When in doubt about doing more work in a phase versus stopping early, lean toward doing more as long as you:
+  - Keep the build green.
+  - Do not introduce speculative behavior.
+  - Stay inside the current subsystem or phase.
+
+---
+
+## 7. How to react to user commands
+
+- **“Proceed”, “continue”, “do as much work per iteration as possible”, “try to do all the work in the current phase you can”**
+  - Stay in the same area.
+  - Perform all safe, obviously related work in that subsystem.
+  - Do not break the work into many tiny tasks.
+- **“Skip certification tasks” or similar**
+  - Do not invoke any certification or heavy pipelines until the user explicitly opts back in.
+- **New feature request**
+  - Respect all the rules above.
+  - Prefer full vertical slices that include:
+    - Implementation
+    - Tests or basic validation where appropriate
+    - Docs and changelog
+    - Build verification

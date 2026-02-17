@@ -5,6 +5,15 @@ using CryptoDayTraderSuite.Models;
 
 namespace CryptoDayTraderSuite.Services
 {
+    public enum StrategyRegimeState
+    {
+        Expansion,
+        Compression,
+        Trend,
+        MeanReversion,
+        FundingExtreme
+    }
+
     public sealed class StrategyExchangePolicyDecision
     {
         public bool IsAllowed { get; set; }
@@ -12,11 +21,13 @@ namespace CryptoDayTraderSuite.Services
         public string RejectReason { get; set; }
         public string PolicyId { get; set; }
         public string PolicyRationale { get; set; }
+        public string RegimeState { get; set; }
     }
 
     public class StrategyExchangePolicyService
     {
         private readonly Dictionary<string, HashSet<string>> _strategyVenueAllowList;
+        private readonly Dictionary<string, HashSet<StrategyRegimeState>> _strategyRegimeAllowList;
 
         public StrategyExchangePolicyService()
         {
@@ -29,12 +40,23 @@ namespace CryptoDayTraderSuite.Services
                 { "fundingcarry", NewVenueSet("Binance", "Bybit", "OKX") },
                 { "crossexchangespreaddivergence", NewVenueSet("Coinbase", "Kraken", "Bitstamp", "Binance", "Bybit", "OKX") }
             };
+
+            _strategyRegimeAllowList = new Dictionary<string, HashSet<StrategyRegimeState>>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "vwaptrend", NewRegimeSet(StrategyRegimeState.Trend, StrategyRegimeState.Expansion) },
+                { "orb", NewRegimeSet(StrategyRegimeState.Expansion, StrategyRegimeState.Trend) },
+                { "rsireversion", NewRegimeSet(StrategyRegimeState.MeanReversion, StrategyRegimeState.Compression) },
+                { "donchian", NewRegimeSet(StrategyRegimeState.Trend, StrategyRegimeState.Expansion) },
+                { "fundingcarry", NewRegimeSet(StrategyRegimeState.FundingExtreme) },
+                { "crossexchangespreaddivergence", NewRegimeSet(StrategyRegimeState.Expansion, StrategyRegimeState.Compression, StrategyRegimeState.MeanReversion) }
+            };
         }
 
         public StrategyExchangePolicyDecision Evaluate(string strategyName, string venue, OrderSide side, MarketBias globalBias, IList<VenueHealthSnapshot> venueHealth)
         {
             var normalizedStrategy = NormalizeStrategy(strategyName);
             var normalizedVenue = NormalizeVenue(venue);
+            var regime = ResolveRegime(normalizedStrategy, globalBias);
 
             if (globalBias == MarketBias.Bearish && side == OrderSide.Buy)
             {
@@ -49,6 +71,19 @@ namespace CryptoDayTraderSuite.Services
             if (string.IsNullOrWhiteSpace(normalizedVenue))
             {
                 return Reject("policy-venue-unknown", strategyName, normalizedVenue, "No routed execution venue was available for policy evaluation.");
+            }
+
+            HashSet<StrategyRegimeState> regimeAllowSet;
+            if (_strategyRegimeAllowList.TryGetValue(normalizedStrategy, out regimeAllowSet) && regimeAllowSet != null && regimeAllowSet.Count > 0)
+            {
+                if (!regimeAllowSet.Contains(regime))
+                {
+                    return Reject(
+                        "regime-mismatch",
+                        strategyName,
+                        normalizedVenue,
+                        "Regime blocked strategy. regime=" + ToRegimeText(regime) + " allowed=" + string.Join(",", regimeAllowSet.Select(ToRegimeText)));
+                }
             }
 
             HashSet<string> allowSet;
@@ -80,13 +115,19 @@ namespace CryptoDayTraderSuite.Services
                 RejectCode = string.Empty,
                 RejectReason = string.Empty,
                 PolicyId = BuildPolicyId(normalizedStrategy, normalizedVenue),
-                PolicyRationale = "strategy-venue matrix allows routed venue; regime and health checks passed"
+                PolicyRationale = "strategy-venue matrix allows routed venue; regime=" + ToRegimeText(regime) + "; health checks passed",
+                RegimeState = ToRegimeText(regime)
             };
         }
 
         private static HashSet<string> NewVenueSet(params string[] venues)
         {
             return new HashSet<string>(venues ?? new string[0], StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static HashSet<StrategyRegimeState> NewRegimeSet(params StrategyRegimeState[] regimes)
+        {
+            return new HashSet<StrategyRegimeState>(regimes ?? new StrategyRegimeState[0]);
         }
 
         private static VenueHealthSnapshot FindVenueHealth(IList<VenueHealthSnapshot> venueHealth, string venue)
@@ -112,14 +153,51 @@ namespace CryptoDayTraderSuite.Services
         private StrategyExchangePolicyDecision Reject(string code, string strategyName, string venue, string reason)
         {
             var normalizedStrategy = NormalizeStrategy(strategyName);
+            var regime = ResolveRegime(normalizedStrategy, MarketBias.Neutral);
             return new StrategyExchangePolicyDecision
             {
                 IsAllowed = false,
                 RejectCode = code ?? "policy-matrix-blocked",
                 RejectReason = reason ?? "Policy rejected candidate.",
                 PolicyId = BuildPolicyId(normalizedStrategy, venue),
-                PolicyRationale = reason ?? "policy-reject"
+                PolicyRationale = reason ?? "policy-reject",
+                RegimeState = ToRegimeText(regime)
             };
+        }
+
+        private static StrategyRegimeState ResolveRegime(string normalizedStrategy, MarketBias globalBias)
+        {
+            if (string.Equals(normalizedStrategy, "fundingcarry", StringComparison.OrdinalIgnoreCase))
+            {
+                return StrategyRegimeState.FundingExtreme;
+            }
+
+            if (string.Equals(normalizedStrategy, "rsireversion", StringComparison.OrdinalIgnoreCase))
+            {
+                return globalBias == MarketBias.Neutral ? StrategyRegimeState.Compression : StrategyRegimeState.MeanReversion;
+            }
+
+            if (string.Equals(normalizedStrategy, "orb", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedStrategy, "donchian", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedStrategy, "crossexchangespreaddivergence", StringComparison.OrdinalIgnoreCase))
+            {
+                return globalBias == MarketBias.Neutral ? StrategyRegimeState.Compression : StrategyRegimeState.Expansion;
+            }
+
+            return globalBias == MarketBias.Neutral ? StrategyRegimeState.Compression : StrategyRegimeState.Trend;
+        }
+
+        private static string ToRegimeText(StrategyRegimeState regime)
+        {
+            switch (regime)
+            {
+                case StrategyRegimeState.Expansion: return "expansion";
+                case StrategyRegimeState.Compression: return "compression";
+                case StrategyRegimeState.Trend: return "trend";
+                case StrategyRegimeState.MeanReversion: return "mean-reversion";
+                case StrategyRegimeState.FundingExtreme: return "funding-extreme";
+                default: return "compression";
+            }
         }
 
         private static string BuildPolicyId(string normalizedStrategy, string normalizedVenue)

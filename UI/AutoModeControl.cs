@@ -178,6 +178,20 @@ namespace CryptoDayTraderSuite.UI
 
 			public string CycleErrorMessage;
 
+			public string RoutingChosenVenues;
+
+			public string RoutingAlternateVenues;
+
+			public string RoutingExecutionModes;
+
+			public int RoutingUnavailableCount;
+
+			public int PolicyHealthBlockedCount;
+
+			public int RegimeBlockedCount;
+
+			public int CircuitBreakerObservedCount;
+
 			public Dictionary<string, int> RejectReasonCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
 			public List<ProfileCycleTelemetry> Profiles = new List<ProfileCycleTelemetry>();
@@ -188,6 +202,20 @@ namespace CryptoDayTraderSuite.UI
 			public List<TradePlan> Plans = new List<TradePlan>();
 
 			public Dictionary<string, int> ReasonCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+			public List<string> ChosenVenues = new List<string>();
+
+			public List<string> AlternateVenues = new List<string>();
+
+			public List<string> ExecutionModes = new List<string>();
+
+			public int RoutingUnavailableCount;
+
+			public int PolicyHealthBlockedCount;
+
+			public int RegimeBlockedCount;
+
+			public int CircuitBreakerObservedCount;
 		}
 
 		private sealed class AutoProfileComboItem
@@ -271,6 +299,10 @@ namespace CryptoDayTraderSuite.UI
 		private readonly List<PaperOpenPosition> _paperOpenPositions = new List<PaperOpenPosition>();
 
 		private readonly Dictionary<string, DateTime> _paperPositionPlanRefreshUtc = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
+		private string _lastRoutingSummaryText = "Routing: n/a";
+
+		private string _lastVenueHealthSummaryText = "Venue Health: n/a";
 
 
 		public AutoModeControl()

@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Brokers\BinanceBroker.cs" />
     <Compile Include="Brokers\BrokerFactory.cs" />
+    <Compile Include="Brokers\BrokerPrecision.cs" />
     <Compile Include="Backtest\Backtester.cs" />
     <Compile Include="Brokers\BybitBroker.cs" />
     <Compile Include="Brokers\CoinbaseExchangeBroker.cs" />

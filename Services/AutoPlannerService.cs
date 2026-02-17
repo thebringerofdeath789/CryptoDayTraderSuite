@@ -289,7 +289,7 @@ namespace CryptoDayTraderSuite.Services
                         strategy.Name,
                         routingDiagnostics != null ? routingDiagnostics.ChosenVenue : string.Empty,
                         candidateSignal.Side,
-                        MarketBias.Neutral,
+                        _engine != null ? _engine.GlobalBias : MarketBias.Neutral,
                         policyHealthSnapshots);
 
                     if (policyDecision != null && !policyDecision.IsAllowed)
@@ -474,6 +474,11 @@ namespace CryptoDayTraderSuite.Services
                 if (!string.IsNullOrWhiteSpace(selectedPolicyDecision.PolicyRationale))
                 {
                     plan.Note += " [PolicyReason=" + selectedPolicyDecision.PolicyRationale + "]";
+                }
+
+                if (!string.IsNullOrWhiteSpace(selectedPolicyDecision.RegimeState))
+                {
+                    plan.Note += " [Regime=" + selectedPolicyDecision.RegimeState + "]";
                 }
             }
 

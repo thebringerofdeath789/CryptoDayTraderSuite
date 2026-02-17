@@ -127,12 +127,12 @@ This checklist operationalizes the architecture and master plan artifacts:
 - **Owner**: Strategy/Services
 - **Primary files**: `Strategy/StrategyEngine.cs`, `Strategy/RiskGuards.cs`, `Services/AutoPlannerService.cs`
 - **Tasks**:
-  - [ ] Implement regime states (`expansion`, `compression`, `trend`, `mean-reversion`, `funding-extreme`).
-  - [ ] Bind strategy families to allowed regimes.
-  - [ ] Block strategy execution outside allowed regime-state map.
+  - [x] Implement regime states (`expansion`, `compression`, `trend`, `mean-reversion`, `funding-extreme`).
+  - [x] Bind strategy families to allowed regimes.
+  - [x] Block strategy execution outside allowed regime-state map.
 - **Acceptance criteria**:
-  - [ ] Runtime emits regime state and per-strategy block/allow rationale.
-  - [ ] No strategy executes when regime disallows it.
+  - [x] Runtime emits regime state and per-strategy block/allow rationale.
+  - [x] No strategy executes when regime disallows it.
 
 ### C19-09 Fee/Slippage Expectancy Gate
 - **Owner**: Services/Strategy
@@ -175,10 +175,10 @@ This checklist operationalizes the architecture and master plan artifacts:
 - **Primary files**: `Services/VenueHealthService.cs`, `Services/AutoPlannerService.cs`, `Services/OrderIntentJournalService.cs` (new), `UI/AutoModeControl.cs`
 - **Tasks**:
   - [x] Add per-venue/global breaker conditions (API failure streak, stale quote ratio, slippage breach streak, ack timeout).
-  - [ ] Add bounded reconnect/backoff and controlled re-enable windows.
+  - [x] Add bounded reconnect/backoff and controlled re-enable windows.
   - [x] Add global safe-set-empty halt behavior.
 - **Acceptance criteria**:
-  - [ ] Breaker transitions are deterministic and fully logged.
+  - [x] Breaker transitions are deterministic and fully logged.
   - [x] Auto loop halts safely when no compliant venue remains.
 
 ### C19-12 Deterministic Evidence Tooling

@@ -22,10 +22,12 @@ namespace CryptoDayTraderSuite.Services
             public DateTime? CircuitOpenedAtUtc;
             public DateTime? CircuitReenableAtUtc;
             public string CircuitReason;
+            public int ConsecutiveCircuitOpens;
         }
 
         private readonly ConcurrentDictionary<string, VenueCounters> _counters = new ConcurrentDictionary<string, VenueCounters>(StringComparer.OrdinalIgnoreCase);
         private readonly TimeSpan _circuitOpenDuration = TimeSpan.FromSeconds(90);
+        private readonly TimeSpan _maxCircuitOpenDuration = TimeSpan.FromMinutes(8);
         private readonly int _maxConsecutiveErrors = 3;
         private readonly int _maxConsecutiveStale = 4;
         private readonly int _maxConsecutiveLatencyBreaches = 4;
@@ -41,7 +43,7 @@ namespace CryptoDayTraderSuite.Services
             var counters = _counters.GetOrAdd(quote.Venue, _ => new VenueCounters());
             lock (counters)
             {
-                TryResetCircuitIfElapsed(counters, DateTime.UtcNow);
+                TryResetCircuitIfElapsed(quote.Venue, counters, DateTime.UtcNow);
                 counters.TotalSamples++;
                 if (hadError)
                 {
@@ -49,7 +51,7 @@ namespace CryptoDayTraderSuite.Services
                     counters.ConsecutiveErrorSamples++;
                     counters.ConsecutiveStaleSamples = 0;
                     counters.ConsecutiveLatencyBreaches = 0;
-                    TryOpenCircuit(counters, DateTime.UtcNow, "api-failure-streak");
+                    TryOpenCircuit(quote.Venue, counters, DateTime.UtcNow, "api-failure-streak");
                 }
                 else
                 {
@@ -61,7 +63,7 @@ namespace CryptoDayTraderSuite.Services
                     {
                         counters.StaleSamples++;
                         counters.ConsecutiveStaleSamples++;
-                        TryOpenCircuit(counters, DateTime.UtcNow, "stale-quote-streak");
+                        TryOpenCircuit(quote.Venue, counters, DateTime.UtcNow, "stale-quote-streak");
                     }
                     else
                     {
@@ -71,11 +73,16 @@ namespace CryptoDayTraderSuite.Services
                     if (quote.RoundTripMs >= _latencyBreachMs)
                     {
                         counters.ConsecutiveLatencyBreaches++;
-                        TryOpenCircuit(counters, DateTime.UtcNow, "latency-breach-streak");
+                        TryOpenCircuit(quote.Venue, counters, DateTime.UtcNow, "latency-breach-streak");
                     }
                     else
                     {
                         counters.ConsecutiveLatencyBreaches = 0;
+                    }
+
+                    if (!quote.IsStale && quote.RoundTripMs > 0 && quote.RoundTripMs < _latencyBreachMs && counters.ConsecutiveCircuitOpens > 0)
+                    {
+                        counters.ConsecutiveCircuitOpens--;
                     }
                 }
             }
@@ -89,7 +96,7 @@ namespace CryptoDayTraderSuite.Services
 
             lock (counters)
             {
-                TryResetCircuitIfElapsed(counters, utcNow);
+                TryResetCircuitIfElapsed(venue, counters, utcNow);
                 return counters.CircuitReenableAtUtc.HasValue && counters.CircuitReenableAtUtc.Value > utcNow;
             }
         }
@@ -120,7 +127,7 @@ namespace CryptoDayTraderSuite.Services
 
                 lock (counters)
                 {
-                    TryResetCircuitIfElapsed(counters, now);
+                    TryResetCircuitIfElapsed(venue, counters, now);
                     var total = Math.Max(1, counters.TotalSamples);
                     var successRatio = (double)counters.SuccessSamples / total;
                     var staleRatio = (double)counters.StaleSamples / total;
@@ -159,7 +166,7 @@ namespace CryptoDayTraderSuite.Services
             return snapshots.OrderByDescending(s => s.HealthScore).ThenBy(s => s.Venue).ToList();
         }
 
-        private void TryOpenCircuit(VenueCounters counters, DateTime utcNow, string reason)
+        private void TryOpenCircuit(string venue, VenueCounters counters, DateTime utcNow, string reason)
         {
             if (counters == null) return;
 
@@ -168,19 +175,29 @@ namespace CryptoDayTraderSuite.Services
                 || counters.ConsecutiveLatencyBreaches >= _maxConsecutiveLatencyBreaches)
             {
                 var wasOpen = counters.CircuitReenableAtUtc.HasValue && counters.CircuitReenableAtUtc.Value > utcNow;
+                if (!wasOpen)
+                {
+                    counters.ConsecutiveCircuitOpens = Math.Min(counters.ConsecutiveCircuitOpens + 1, 5);
+                }
+
+                var backoffMultiplier = (int)Math.Pow(2d, Math.Max(0, counters.ConsecutiveCircuitOpens - 1));
+                var dynamicOpenDuration = TimeSpan.FromTicks(Math.Min(_maxCircuitOpenDuration.Ticks, _circuitOpenDuration.Ticks * backoffMultiplier));
                 counters.CircuitOpenedAtUtc = utcNow;
-                counters.CircuitReenableAtUtc = utcNow.Add(_circuitOpenDuration);
+                counters.CircuitReenableAtUtc = utcNow.Add(dynamicOpenDuration);
                 counters.CircuitReason = reason;
 
                 if (!wasOpen)
                 {
-                    Log.Warn("[VenueHealth] Circuit opened for venue. reason=" + reason
+                    Log.Warn("[VenueHealth] Circuit opened venue=" + (venue ?? "n/a")
+                        + " reason=" + reason
+                        + " backoffSeconds=" + ((int)dynamicOpenDuration.TotalSeconds).ToString()
+                        + " openCount=" + counters.ConsecutiveCircuitOpens.ToString()
                         + " reenableUtc=" + counters.CircuitReenableAtUtc.Value.ToString("o"));
                 }
             }
         }
 
-        private void TryResetCircuitIfElapsed(VenueCounters counters, DateTime utcNow)
+        private void TryResetCircuitIfElapsed(string venue, VenueCounters counters, DateTime utcNow)
         {
             if (counters == null) return;
             if (!counters.CircuitReenableAtUtc.HasValue) return;
@@ -195,7 +212,10 @@ namespace CryptoDayTraderSuite.Services
             counters.ConsecutiveStaleSamples = 0;
             counters.ConsecutiveLatencyBreaches = 0;
 
-            Log.Info("[VenueHealth] Circuit re-enabled for venue. priorReason=" + (priorReason ?? "n/a"));
+            Log.Info("[VenueHealth] Circuit re-enabled venue=" + (venue ?? "n/a")
+                + " priorReason=" + (priorReason ?? "n/a")
+                + " consecutiveOpens=" + counters.ConsecutiveCircuitOpens.ToString());
         }
+
     }
 }

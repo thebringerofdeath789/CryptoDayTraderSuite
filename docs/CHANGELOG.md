@@ -1,5 +1,74 @@
 # Changelog
 
+## [Broker Reliability] - Outcome Taxonomy Consistency Pass - 2026-02-17
+
+### Changed
+- **Validation Category Normalized**: Updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` so `PlaceOrderAsync(...)` invalid-normalized-symbol paths return `BuildFailureMessage("validation", ..., "symbol is invalid after normalization")` instead of raw unclassified strings.
+- **Cancel Success Category Normalized**: Updated the same broker `CancelAllAsync(...)` success paths to emit `BuildSuccessMessage("canceled", ...)` for consistent taxonomy between place and cancel outcomes.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after broker outcome taxonomy consistency updates.
+
+## [Broker Reliability] - Place Failure Category Normalization - 2026-02-17
+
+### Changed
+- **Place Error Category Fixed**: Updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` so `PlaceOrderAsync(...)` exception paths return `BuildFailureMessage("place", ..., "place failed")` instead of misclassified `cancel` category errors.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after broker place-path category normalization.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_183610.txt` reports `VERDICT=PARTIAL` with strict gates clear (`STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_POLICY_DECISION=allow-geo-partial`).
+
+## [Strategy + Guardrails] - Regime-State Policy Gating + Bounded Circuit Backoff - 2026-02-17
+
+### Changed
+- **Regime-State Policy Gate Added**: Updated `Services/StrategyExchangePolicyService.cs` to classify deterministic runtime regime states (`expansion`, `compression`, `trend`, `mean-reversion`, `funding-extreme`) and enforce strategy-specific regime allow maps with explicit `regime-mismatch` rejection rationale.
+- **Live Bias Wiring Fixed**: Updated `Services/AutoPlannerService.cs` policy evaluation call to use live `_engine.GlobalBias` (instead of neutral-only evaluation) and added regime tags to emitted plan notes for runtime diagnostics.
+- **Circuit Recovery Backoff Added**: Updated `Services/VenueHealthService.cs` with bounded reconnect windows (exponential backoff capped at 8 minutes) plus deterministic circuit open/re-enable transition logs including venue, reason, and backoff metadata.
+- **Broker Compile Regression Repaired**: Restored missing `BuildFailureMessage(...)` helpers in `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` to resolve compile breaks in formatted failure-return paths.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after regime/guardrail changes.
+- **Strict Certification**: Task `strict-cert-once-3` reports `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `VERDICT=PARTIAL`, `STRICT_POLICY_DECISION=allow-geo-partial`.
+
+## [Broker Validation] - Shared Precision Helper Consolidation - 2026-02-17
+
+### Changed
+- **Shared Precision Utility Added**: Added `Brokers/BrokerPrecision.cs` with centralized step-alignment helpers (`AlignDownToStep`, `IsAlignedToStep`) and tolerance logic.
+- **Broker Duplication Removed**: Refactored `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` to use `BrokerPrecision` and removed duplicated local precision helper methods.
+- **Project Wiring Updated**: Added `Brokers/BrokerPrecision.cs` compile include in `CryptoDayTraderSuite.csproj`.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after helper consolidation.
+- **Strict Certification (Post-Consolidation)**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_182953.txt` reports `VERDICT=PARTIAL` with strict gates clear (`StrictFailureClass=NONE`, `StrictFailures=count=0`, `StrictPolicyDecision=allow-geo-partial`).
+
+## [Ops Tooling] - Final Strict Contract Signoff Verification - 2026-02-17
+
+### Verified
+- **Strict Certification Contract Emission**: `Util/run_multiexchange_certification.ps1 -Strict` emitted stable CI contract lines (`CI_VERSION=1`, ordered `CI_FIELDS`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_POLICY_DECISION=allow-geo-partial`, `VERDICT=PARTIAL`) and generated artifacts `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_182112.json` + `.txt`.
+- **Contract Checker PASS**: `Util/check_multiexchange_contract.ps1 -Strict` completed with `CONTRACT_EXIT_CODE=0`, `CONTRACT_MISSING_KEYS=none`, `CONTRACT_FIELDS_MISSING=none`, `CONTRACT_CISUMMARY_VERSION_OK=True`, `CONTRACT_RESULT=PASS`, and generated artifacts `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_182138.json` + `.txt`.
+
+## [Audit Planning] - Phase X Discovery Complete + Consolidated Hardening Sequence - 2026-02-17
+
+### Changed
+- **Discovery Iterations Completed**: Completed Phase X discovery-only audit iterations across `Brokers/`, `Exchanges/`, `Services/`, and UI orchestration (`UI/AutoModeControl.cs`, `UI/PlannerControl.cs`, `MainForm.cs`, `Program.cs`).
+- **Finding Set Consolidated**: Normalized iteration findings into a single `BUG-101` to `BUG-117` backlog for post-audit remediation planning.
+- **Execution Waves Added**: Updated `ROADMAP.md` with deduplicated remediation sequencing:
+    - `Wave 1`: critical execution safety blockers,
+    - `Wave 2`: major runtime integrity issues,
+    - `Wave 3`: contract/docs/observability closure items.
+
+### Notes
+- This changelog entry records planning/discovery state only; no production behavior changes were introduced as part of this audit consolidation pass.
+
+## [Broker Validation] - Precision-Tolerant Step/Tick Alignment - 2026-02-17
+
+### Changed
+- **Cross-Broker Alignment Hardening**: Updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` to evaluate step/tick alignment with tolerance-based comparisons instead of strict decimal equality.
+- **Quantity Validation Robustness**: `ValidateTradePlanAsync(...)` in each broker now uses `IsAlignedToStep(plan.Qty, constraints.StepSize)` directly for step-size checks, eliminating false negatives caused by decimal precision artifacts.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after precision hardening changes.
+
 ## [Ops Tooling] - Reject-Capture Runtime Retry Condition Validation - 2026-02-17
 
 ### Changed
@@ -2358,4 +2427,6 @@
 ### Removed
 - **Legacy Static Code**: Deleted `HistoryStore.cs`, `KeyRegistry.cs`, `AccountRegistry.cs`, `ProfileStore.cs`, `TimeFilters.cs`.
 - **Redundant Utilities**: Deleted `KeyStore.cs`, `JsonUtil.cs`.
+
+
 
