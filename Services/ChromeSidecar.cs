@@ -49,6 +49,7 @@ namespace CryptoDayTraderSuite.Services
         private const int HostProbeTimeoutMs = 5000;
         private const int HostLaunchWaitMs = 9000;
         private const int SwHide = 0;
+        private const int SwShowMinimized = 2;
         private const int SwShow = 5;
         private const int SwRestore = 9;
 
@@ -411,7 +412,7 @@ namespace CryptoDayTraderSuite.Services
 
         public async Task<string> QueryAIAsync(string prompt)
         {
-            return await QueryAIAsync(prompt, _provider, false);
+            return await QueryAIAsync(prompt, AiProvider.Unknown, false);
         }
 
         private async Task<string> QueryAIAsync(string prompt, AiProvider preferredProvider)
@@ -1200,16 +1201,20 @@ namespace CryptoDayTraderSuite.Services
                 {
                     FileName = chromePath,
                     Arguments = args.ToString(),
-                    UseShellExecute = true,
+                    UseShellExecute = false,
                     WindowStyle = _launchChromeHidden ? ProcessWindowStyle.Hidden : ProcessWindowStyle.Minimized
                 };
 
                 var process = Process.Start(psi);
                 _managedChromeProcessId = process != null ? process.Id : 0;
+                Thread.Sleep(450);
                 if (_launchChromeHidden)
                 {
-                    Thread.Sleep(450);
                     SetManagedChromeVisible(false);
+                }
+                else
+                {
+                    EnsureManagedChromeMinimized();
                 }
                 return true;
             }
@@ -1251,6 +1256,17 @@ namespace CryptoDayTraderSuite.Services
             }
 
             return IntPtr.Zero;
+        }
+
+        private void EnsureManagedChromeMinimized()
+        {
+            var handle = TryGetManagedChromeWindowHandle();
+            if (handle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            ShowWindow(handle, SwShowMinimized);
         }
 
         private string ResolveChromePath()

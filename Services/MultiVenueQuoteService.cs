@@ -43,6 +43,31 @@ namespace CryptoDayTraderSuite.Services
                 venueList.Add("Coinbase");
             }
 
+            if (_venueHealthService != null)
+            {
+                venueList = venueList
+                    .Where(v => !_venueHealthService.IsVenueDisabled(v))
+                    .ToList();
+            }
+
+            venueList = venueList
+                .Where(v => !GeoBlockRegistry.IsDisabled(v))
+                .ToList();
+
+            if (venueList.Count == 0)
+            {
+                return new CompositeQuote
+                {
+                    Symbol = symbol,
+                    Mid = 0m,
+                    ComputedAtUtc = DateTime.UtcNow,
+                    BestVenue = string.Empty,
+                    IsStale = true,
+                    Confidence = 0m,
+                    Venues = new List<VenueQuoteSnapshot>()
+                };
+            }
+
             var tasks = venueList.Select(v => FetchVenueSnapshotSafeAsync(v, normalizedBase, normalizedQuote)).ToArray();
             var snapshots = await Task.WhenAll(tasks).ConfigureAwait(false);
             var valid = snapshots.Where(s => s != null && s.Mid > 0m).ToList();
@@ -152,12 +177,14 @@ namespace CryptoDayTraderSuite.Services
                     catch (Exception ex)
                     {
                         Log.Warn("[MultiVenueQuoteService] Ticker failed for " + venue + " " + productId + ": " + ex.Message);
+                        TryAutoDisableVenueOnGeoRestriction(venue, ex);
                     }
                 }
             }
             catch (Exception ex)
             {
                 Log.Warn("[MultiVenueQuoteService] Venue fetch failed for " + venue + ": " + ex.Message);
+                TryAutoDisableVenueOnGeoRestriction(venue, ex);
             }
             finally
             {
@@ -225,6 +252,25 @@ namespace CryptoDayTraderSuite.Services
             }
 
             return candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private void TryAutoDisableVenueOnGeoRestriction(string venue, Exception ex)
+        {
+            if (ex == null || string.IsNullOrWhiteSpace(venue))
+            {
+                return;
+            }
+
+            if (!GeoBlockRegistry.TryDisableFromException(venue, ex, "quote-fetch"))
+            {
+                return;
+            }
+
+            var reason = GeoBlockRegistry.GetDisableReason(venue);
+            if (_venueHealthService != null)
+            {
+                _venueHealthService.TryDisableVenue(venue, string.IsNullOrWhiteSpace(reason) ? "geo-restricted" : reason);
+            }
         }
     }
 }

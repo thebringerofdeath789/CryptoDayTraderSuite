@@ -350,8 +350,8 @@ namespace CryptoDayTraderSuite.Exchanges
                 {
                     var row = rowObj as Dictionary<string, object>;
                     if (row == null) continue;
-                    if (!string.Equals(GetString(row, "orderId"), orderId, StringComparison.OrdinalIgnoreCase)) continue;
-                    symbol = GetString(row, "symbol");
+                    if (!string.Equals(ReadBinanceOrderId(row), orderId, StringComparison.OrdinalIgnoreCase)) continue;
+                    symbol = NormalizeProduct(ReadBinanceSymbol(row));
                     if (!string.IsNullOrWhiteSpace(symbol))
                     {
                         CacheOrderSymbol(orderId, symbol);
@@ -391,7 +391,7 @@ namespace CryptoDayTraderSuite.Exchanges
             {
                 var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
                 var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
-                var canceledOrderId = GetString(obj, "orderId");
+                var canceledOrderId = ReadBinanceOrderId(obj);
                 var status = GetString(obj, "status");
 
                 if (!string.IsNullOrWhiteSpace(canceledOrderId)
@@ -402,10 +402,7 @@ namespace CryptoDayTraderSuite.Exchanges
 
                 if (!string.IsNullOrWhiteSpace(status))
                 {
-                    return string.Equals(status, "CANCELED", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(status, "PENDING_CANCEL", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(status, "EXPIRED", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(status, "REJECTED", StringComparison.OrdinalIgnoreCase);
+                    return IsBinanceCanceledLikeStatus(status);
                 }
 
                 return !string.IsNullOrWhiteSpace(canceledOrderId);
@@ -462,9 +459,15 @@ namespace CryptoDayTraderSuite.Exchanges
         public async Task<bool> CancelAllOpenOrdersAsync(string productId)
         {
             EnsureCredentials();
+            var normalizedProduct = NormalizeProduct(productId);
+            if (string.IsNullOrWhiteSpace(normalizedProduct))
+            {
+                return false;
+            }
+
             var payload = new Dictionary<string, string>
             {
-                { "symbol", NormalizeProduct(productId) },
+                { "symbol", normalizedProduct },
                 { "recvWindow", "5000" }
             };
             var query = BuildSignedQuery(payload);
@@ -475,20 +478,28 @@ namespace CryptoDayTraderSuite.Exchanges
             var arr = UtilCompat.JsonDeserialize<object[]>(json);
             if (arr != null)
             {
+                if (arr.Length == 0)
+                {
+                    return true;
+                }
+
                 for (int i = 0; i < arr.Length; i++)
                 {
                     var row = arr[i] as Dictionary<string, object>;
-                    if (row == null) continue;
+                    if (row == null) return false;
 
                     var status = GetString(row, "status");
-                    if (string.IsNullOrWhiteSpace(status)) continue;
+                    if (string.IsNullOrWhiteSpace(status)) return false;
 
-                    if (!string.Equals(status, "CANCELED", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(status, "PENDING_CANCEL", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(status, "EXPIRED", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(status, "REJECTED", StringComparison.OrdinalIgnoreCase))
+                    if (!IsBinanceCanceledLikeStatus(status))
                     {
                         return false;
+                    }
+
+                    var rowOrderId = ReadBinanceOrderId(row);
+                    if (!string.IsNullOrWhiteSpace(rowOrderId))
+                    {
+                        RemoveCachedOrderSymbol(rowOrderId);
                     }
                 }
 
@@ -502,6 +513,36 @@ namespace CryptoDayTraderSuite.Exchanges
         {
             if (string.IsNullOrWhiteSpace(symbol)) return string.Empty;
             return symbol.Replace("/", "").Replace("-", "").ToUpperInvariant();
+        }
+
+        private string ReadBinanceOrderId(Dictionary<string, object> row)
+        {
+            var value = GetString(row, "orderId");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "order_id");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "id");
+            return value;
+        }
+
+        private string ReadBinanceSymbol(Dictionary<string, object> row)
+        {
+            var value = GetString(row, "symbol");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "product_id");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "productId");
+            return value;
+        }
+
+        private bool IsBinanceCanceledLikeStatus(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return false;
+            }
+
+            return string.Equals(status, "CANCELED", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "PENDING_CANCEL", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "EXPIRED", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "EXPIRED_IN_MATCH", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "REJECTED", StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<Dictionary<string, object>> GetExchangeInfoAsync()
@@ -700,8 +741,23 @@ namespace CryptoDayTraderSuite.Exchanges
 
         private string GetString(Dictionary<string, object> obj, string key)
         {
-            if (obj == null || string.IsNullOrWhiteSpace(key) || !obj.ContainsKey(key) || obj[key] == null) return string.Empty;
-            return Convert.ToString(obj[key], CultureInfo.InvariantCulture) ?? string.Empty;
+            if (obj == null || string.IsNullOrWhiteSpace(key)) return string.Empty;
+
+            object value;
+            if (obj.TryGetValue(key, out value) && value != null)
+            {
+                return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+
+            foreach (var pair in obj)
+            {
+                if (pair.Key == null) continue;
+                if (!string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase)) continue;
+                if (pair.Value == null) return string.Empty;
+                return Convert.ToString(pair.Value, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+
+            return string.Empty;
         }
 
         private static string ResolveRestBaseUrl(string overrideBaseUrl)

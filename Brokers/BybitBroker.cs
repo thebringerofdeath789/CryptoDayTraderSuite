@@ -33,25 +33,25 @@ namespace CryptoDayTraderSuite.Brokers
 
         public async Task<(bool ok, string message)> ValidateTradePlanAsync(TradePlan plan)
         {
-            if (plan == null) return (false, "trade plan is null");
-            if (string.IsNullOrWhiteSpace(plan.Symbol)) return (false, "symbol is required");
-            if (plan.Qty <= 0m) return (false, "quantity must be > 0");
-            if (plan.Entry <= 0m) return (false, "entry must be > 0");
-            if (plan.Stop <= 0m || plan.Target <= 0m) return (false, "protective stop/target required");
-            if (plan.Direction == 0) return (false, "direction must be non-zero");
+            if (plan == null) return (false, BuildFailureMessage("validation", null, "trade plan is null"));
+            if (string.IsNullOrWhiteSpace(plan.Symbol)) return (false, BuildFailureMessage("validation", null, "symbol is required"));
+            if (plan.Qty <= 0m) return (false, BuildFailureMessage("validation", null, "quantity must be > 0"));
+            if (plan.Entry <= 0m) return (false, BuildFailureMessage("validation", null, "entry must be > 0"));
+            if (plan.Stop <= 0m || plan.Target <= 0m) return (false, BuildFailureMessage("validation", null, "protective stop/target required"));
+            if (plan.Direction == 0) return (false, BuildFailureMessage("validation", null, "direction must be non-zero"));
 
             if (plan.Direction > 0)
             {
                 if (!(plan.Stop < plan.Entry && plan.Entry < plan.Target))
                 {
-                    return (false, "invalid long risk geometry (expected stop < entry < target)");
+                    return (false, BuildFailureMessage("validation", null, "invalid long risk geometry (expected stop < entry < target)"));
                 }
             }
             else
             {
                 if (!(plan.Target < plan.Entry && plan.Entry < plan.Stop))
                 {
-                    return (false, "invalid short risk geometry (expected target < entry < stop)");
+                    return (false, BuildFailureMessage("validation", null, "invalid short risk geometry (expected target < entry < stop)"));
                 }
             }
 
@@ -67,7 +67,7 @@ namespace CryptoDayTraderSuite.Brokers
                 var constraints = await client.GetSymbolConstraintsAsync(normalizedSymbol).ConfigureAwait(false);
                 if (constraints == null)
                 {
-                    return (false, "unable to resolve bybit symbol constraints");
+                    return (false, BuildFailureMessage("constraints", null, "unable to resolve bybit symbol constraints"));
                 }
 
                 if (constraints.StepSize > 0m)
@@ -75,47 +75,47 @@ namespace CryptoDayTraderSuite.Brokers
                     var alignedQty = BrokerPrecision.AlignDownToStep(plan.Qty, constraints.StepSize);
                     if (alignedQty <= 0m)
                     {
-                        return (false, "quantity rounds below minimum step size");
+                        return (false, BuildFailureMessage("constraints", null, "quantity rounds below minimum step size"));
                     }
 
                     if (!BrokerPrecision.IsAlignedToStep(plan.Qty, constraints.StepSize))
                     {
-                        return (false, "quantity does not align with symbol step size");
+                        return (false, BuildFailureMessage("constraints", null, "quantity does not align with symbol step size"));
                     }
                 }
 
                 if (constraints.MinQty > 0m && plan.Qty < constraints.MinQty)
                 {
-                    return (false, "quantity below symbol minimum");
+                    return (false, BuildFailureMessage("constraints", null, "quantity below symbol minimum"));
                 }
 
                 if (constraints.MaxQty > 0m && plan.Qty > constraints.MaxQty)
                 {
-                    return (false, "quantity above symbol maximum");
+                    return (false, BuildFailureMessage("constraints", null, "quantity above symbol maximum"));
                 }
 
                 if (constraints.PriceTickSize > 0m)
                 {
                     if (!BrokerPrecision.IsAlignedToStep(plan.Entry, constraints.PriceTickSize))
                     {
-                        return (false, "entry does not align with symbol price tick");
+                        return (false, BuildFailureMessage("constraints", null, "entry does not align with symbol price tick"));
                     }
 
                     if (!BrokerPrecision.IsAlignedToStep(plan.Stop, constraints.PriceTickSize))
                     {
-                        return (false, "stop does not align with symbol price tick");
+                        return (false, BuildFailureMessage("constraints", null, "stop does not align with symbol price tick"));
                     }
 
                     if (!BrokerPrecision.IsAlignedToStep(plan.Target, constraints.PriceTickSize))
                     {
-                        return (false, "target does not align with symbol price tick");
+                        return (false, BuildFailureMessage("constraints", null, "target does not align with symbol price tick"));
                     }
                 }
 
                 var notional = plan.Entry * plan.Qty;
                 if (constraints.MinNotional > 0m && notional < constraints.MinNotional)
                 {
-                    return (false, "order notional below symbol minimum");
+                    return (false, BuildFailureMessage("constraints", null, "order notional below symbol minimum"));
                 }
             }
             catch (Exception ex)
@@ -124,7 +124,7 @@ namespace CryptoDayTraderSuite.Brokers
                 return (false, BuildFailureMessage("constraints", ex.Message, "unable to validate symbol constraints"));
             }
 
-            return (true, "ok");
+            return (true, BuildSuccessMessage("validation", "ok"));
         }
 
         public async Task<(bool ok, string message)> PlaceOrderAsync(TradePlan plan)
@@ -173,7 +173,9 @@ namespace CryptoDayTraderSuite.Brokers
                 if (string.IsNullOrWhiteSpace(normalizedSymbol)) return (false, BuildFailureMessage("validation", null, "symbol is invalid after normalization"));
                 var client = CreateClient(null);
                 var ok = await client.CancelAllOpenOrdersAsync(normalizedSymbol).ConfigureAwait(false);
-                return ok ? (true, BuildSuccessMessage("canceled", "canceled open orders")) : (false, BuildFailureMessage("cancel", null, "cancel-all failed"));
+                return ok
+                    ? (true, BuildSuccessMessage("canceled", "symbol=" + normalizedSymbol + " canceled open orders"))
+                    : (false, BuildFailureMessage("cancel", null, "cancel-all failed for symbol=" + normalizedSymbol));
             }
             catch (Exception ex)
             {
@@ -183,18 +185,12 @@ namespace CryptoDayTraderSuite.Brokers
         }
         private string BuildSuccessMessage(string category, string detail)
         {
-            var normalizedCategory = string.IsNullOrWhiteSpace(category) ? "ok" : category.Trim().ToLowerInvariant();
-            var body = string.IsNullOrWhiteSpace(detail) ? "ok" : detail.Trim();
-            if (body.Length > 220) body = body.Substring(0, 220) + "...";
-            return normalizedCategory + ": " + body;
+            return BrokerMessageFormatter.BuildSuccessMessage(category, detail);
         }
 
         private string BuildFailureMessage(string category, string detail, string fallback)
         {
-            var normalizedCategory = string.IsNullOrWhiteSpace(category) ? "error" : category.Trim().ToLowerInvariant();
-            var body = string.IsNullOrWhiteSpace(detail) ? (fallback ?? "error") : detail.Trim();
-            if (body.Length > 220) body = body.Substring(0, 220) + "...";
-            return normalizedCategory + ": " + body;
+            return BrokerMessageFormatter.BuildFailureMessage(category, detail, fallback);
         }
 
         private string NormalizeBybitSymbol(string symbol)

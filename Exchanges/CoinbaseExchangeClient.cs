@@ -654,14 +654,38 @@ namespace CryptoDayTraderSuite.Exchanges
 			for (int i = 0; i < orders.Count; i++)
 			{
 				var row = orders[i];
+				if (row == null)
+				{
+					continue;
+				}
+
 				var status = ReadStatusValue(row);
-				if (string.IsNullOrWhiteSpace(status) || IsOpenLikeStatus(status.ToUpperInvariant()))
+				if (IsOpenLikeStatus(string.IsNullOrWhiteSpace(status) ? string.Empty : status.ToUpperInvariant())
+					|| IsExplicitlyOpenOrderRow(row))
 				{
 					filtered.Add(row);
 				}
 			}
 
 			return filtered;
+		}
+
+		private bool IsExplicitlyOpenOrderRow(Dictionary<string, object> row)
+		{
+			if (row == null)
+			{
+				return false;
+			}
+
+			return ReadBoolValue(row, "open")
+				|| ReadBoolValue(row, "is_open")
+				|| ReadBoolValue(row, "isOpen")
+				|| ReadBoolValue(row, "active")
+				|| ReadBoolValue(row, "is_active")
+				|| ReadBoolValue(row, "isActive")
+				|| ReadBoolValue(row, "pending")
+				|| ReadBoolValue(row, "is_pending")
+				|| ReadBoolValue(row, "isPending");
 		}
 
 		private List<Dictionary<string, object>> EnrichFillRows(List<Dictionary<string, object>> fills)
@@ -1396,12 +1420,16 @@ namespace CryptoDayTraderSuite.Exchanges
 		{
 			if (string.IsNullOrWhiteSpace(statusUpper))
 			{
-				return true;
+				return false;
 			}
 
 			return statusUpper == "OPEN"
+				|| statusUpper == "OPENED"
+				|| statusUpper == "PENDING_OPEN"
 				|| statusUpper == "PENDING"
+				|| statusUpper == "QUEUED"
 				|| statusUpper == "ACTIVE"
+				|| statusUpper == "RESTING"
 				|| statusUpper == "WORKING"
 				|| statusUpper == "NEW"
 				|| statusUpper == "PARTIALLY_FILLED"

@@ -348,6 +348,11 @@ namespace CryptoDayTraderSuite.Exchanges
             var openReq = BuildSignedRequest(HttpMethod.Get, "/v5/order/realtime", "category=spot&openOnly=0", string.Empty);
             var openJson = await HttpUtil.SendAsync(openReq).ConfigureAwait(false);
             var openRoot = UtilCompat.JsonDeserialize<Dictionary<string, object>>(openJson);
+            if (!IsBybitSuccess(openRoot))
+            {
+                return false;
+            }
+
             var openResult = GetMap(openRoot, "result");
             var list = ToObjectArray(openResult != null && openResult.ContainsKey("list") ? openResult["list"] : null);
 
@@ -356,8 +361,8 @@ namespace CryptoDayTraderSuite.Exchanges
             {
                 var row = rowObj as Dictionary<string, object>;
                 if (row == null) continue;
-                if (!string.Equals(GetString(row, "orderId"), orderId, StringComparison.OrdinalIgnoreCase)) continue;
-                symbol = GetString(row, "symbol");
+                if (!string.Equals(ReadBybitOrderId(row), orderId, StringComparison.OrdinalIgnoreCase)) continue;
+                symbol = NormalizeProduct(ReadBybitSymbol(row));
                 break;
             }
 
@@ -379,10 +384,16 @@ namespace CryptoDayTraderSuite.Exchanges
         public async Task<bool> CancelAllOpenOrdersAsync(string productId)
         {
             EnsureCredentials();
+            var normalizedProduct = NormalizeProduct(productId);
+            if (string.IsNullOrWhiteSpace(normalizedProduct))
+            {
+                return false;
+            }
+
             var body = UtilCompat.JsonSerialize(new Dictionary<string, object>
             {
                 { "category", "spot" },
-                { "symbol", NormalizeProduct(productId) }
+                { "symbol", normalizedProduct }
             });
             var req = BuildSignedRequest(HttpMethod.Post, "/v5/order/cancel-all", string.Empty, body);
             var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
@@ -402,14 +413,72 @@ namespace CryptoDayTraderSuite.Exchanges
             for (int i = 0; i < list.Length; i++)
             {
                 var row = list[i] as Dictionary<string, object>;
-                if (row == null) continue;
-                if (!string.Equals(GetString(row, "success"), "1", StringComparison.OrdinalIgnoreCase))
+                if (row == null)
+                {
+                    return false;
+                }
+
+                if (!IsBybitCancelAllRowSuccess(row))
                 {
                     return false;
                 }
             }
 
             return true;
+        }
+
+        private string ReadBybitOrderId(Dictionary<string, object> row)
+        {
+            var value = GetString(row, "orderId");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "order_id");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "orderID");
+            return value;
+        }
+
+        private string ReadBybitSymbol(Dictionary<string, object> row)
+        {
+            var value = GetString(row, "symbol");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "product_id");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "productId");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "instrument_id");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "instrumentId");
+            return value;
+        }
+
+        private bool IsBybitCancelAllRowSuccess(Dictionary<string, object> row)
+        {
+            if (row == null)
+            {
+                return false;
+            }
+
+            var success = GetString(row, "success");
+            if (!string.IsNullOrWhiteSpace(success))
+            {
+                if (string.Equals(success, "1", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(success, "true", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(success, "ok", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(success, "success", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
+            var sCode = GetString(row, "sCode");
+            if (!string.IsNullOrWhiteSpace(sCode))
+            {
+                return string.Equals(sCode, "0", StringComparison.OrdinalIgnoreCase);
+            }
+
+            var retCode = GetString(row, "retCode");
+            if (!string.IsNullOrWhiteSpace(retCode))
+            {
+                return string.Equals(retCode, "0", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return false;
         }
 
         private async Task<Dictionary<string, object>> QueryFeeRateAsync(string query)
@@ -651,8 +720,23 @@ namespace CryptoDayTraderSuite.Exchanges
 
         private string GetString(Dictionary<string, object> obj, string key)
         {
-            if (obj == null || string.IsNullOrWhiteSpace(key) || !obj.ContainsKey(key) || obj[key] == null) return string.Empty;
-            return Convert.ToString(obj[key], CultureInfo.InvariantCulture) ?? string.Empty;
+            if (obj == null || string.IsNullOrWhiteSpace(key)) return string.Empty;
+
+            object value;
+            if (obj.TryGetValue(key, out value) && value != null)
+            {
+                return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+
+            foreach (var pair in obj)
+            {
+                if (pair.Key == null) continue;
+                if (!string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase)) continue;
+                if (pair.Value == null) return string.Empty;
+                return Convert.ToString(pair.Value, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+
+            return string.Empty;
         }
 
         private string ComputeHmacSha256HexLower(string secret, string payload)

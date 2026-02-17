@@ -31,6 +31,12 @@ namespace CryptoDayTraderSuite.Services
             if (string.IsNullOrEmpty(brokerName)) brokerName = "Coinbase";
             var rawBrokerName = brokerName;
             brokerName = NormalizeBrokerName(brokerName);
+            if (GeoBlockRegistry.IsDisabled(brokerName))
+            {
+                var reason = GeoBlockRegistry.GetDisableReason(brokerName);
+                Log.Warn("[Connection] Authenticated client blocked by geo-disable for " + brokerName + " reason=" + reason);
+                return new DisabledExchangeClient(brokerName, reason);
+            }
             Log.Info($"[Connection] CreateAuthenticatedClient requested for {brokerName}");
 
             var activeKeyId = _keyService.GetActiveId(brokerName);
@@ -82,6 +88,12 @@ namespace CryptoDayTraderSuite.Services
         {
             if (string.IsNullOrEmpty(brokerName)) brokerName = "Coinbase";
             brokerName = NormalizeBrokerName(brokerName);
+            if (GeoBlockRegistry.IsDisabled(brokerName))
+            {
+                var reason = GeoBlockRegistry.GetDisableReason(brokerName);
+                Log.Warn("[Connection] Public client blocked by geo-disable for " + brokerName + " reason=" + reason);
+                return new DisabledExchangeClient(brokerName, reason);
+            }
             Log.Info($"[Connection] Public client created for {brokerName}");
             return Factory(brokerName, null, null, null);
         }
@@ -172,7 +184,7 @@ namespace CryptoDayTraderSuite.Services
             }
 
             // Wrap in resilience policy (Retries on Network Error)
-            return new ResilientExchangeClient(client);
+            return new ResilientExchangeClient(client, serviceKey: brokerName);
         }
     }
 }

@@ -8,6 +8,23 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Complete-Result {
+    param(
+        [int]$Code
+    )
+
+    Write-Host ('RESULT_EXIT_CODE=' + $Code)
+    Write-Host ('PROBE_EXIT_CODE=' + $Code)
+    exit $Code
+}
+
+trap {
+    $message = if ($null -ne $_ -and $null -ne $_.Exception) { $_.Exception.Message } else { 'unknown error' }
+    Write-Host ('PROBE_ERROR=' + $message)
+    Write-Host 'PROBE_VERDICT=FAIL'
+    Complete-Result -Code 1
+}
+
 function Resolve-RepoRoot {
     param([string]$Path)
 
@@ -260,10 +277,10 @@ try {
     Write-Host ("PROBE_VERDICT=" + $verdict)
 
     if ($verdict -eq "FAIL") {
-        exit 1
+        Complete-Result -Code 1
     }
 
-    exit 0
+    Complete-Result -Code 0
 }
 finally {
     Pop-Location

@@ -11,6 +11,16 @@
 
 $ErrorActionPreference = "Stop"
 
+function Complete-Result {
+    param(
+        [int]$Code
+    )
+
+    Write-Output ('RESULT_EXIT_CODE=' + $Code)
+    Write-Output ('MATRIX_EXIT_CODE=' + $Code)
+    exit $Code
+}
+
 function Resolve-ReportPath {
     param(
         [string]$ExplicitPath,
@@ -236,15 +246,18 @@ try {
 
     $failures = @($checkResults | Where-Object { -not $_.Passed })
     if ($failures.Count -gt 0) {
-        Write-Error ("Matrix validation failed with {0} failing check(s)." -f $failures.Count)
-        exit 1
+        Write-Output ("MATRIX_ERROR=Matrix validation failed with {0} failing check(s)." -f $failures.Count)
+        Write-Output 'MATRIX_RESULT=FAIL'
+        Complete-Result -Code 1
     }
 
     Write-Host ""
     Write-Host "Matrix validation passed."
-    exit 0
+    Write-Output 'MATRIX_RESULT=PASS'
+    Complete-Result -Code 0
 }
 catch {
-    Write-Error $_.Exception.Message
-    exit 1
+    Write-Output ('MATRIX_ERROR=' + $_.Exception.Message)
+    Write-Output 'MATRIX_RESULT=FAIL'
+    Complete-Result -Code 1
 }

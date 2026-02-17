@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Brokers\BinanceBroker.cs" />
     <Compile Include="Brokers\BrokerFactory.cs" />
+    <Compile Include="Brokers\BrokerMessageFormatter.cs" />
     <Compile Include="Brokers\BrokerPrecision.cs" />
     <Compile Include="Backtest\Backtester.cs" />
     <Compile Include="Brokers\BybitBroker.cs" />
@@ -117,6 +118,7 @@
     <Compile Include="Services\AccountService.cs" />
     <Compile Include="Services\AccountBuyingPowerService.cs" />
     <Compile Include="Services\AIGovernor.cs" />
+    <Compile Include="Services\AiJsonSchemas.cs" />
     <Compile Include="Services\AutoModeProfileService.cs" />
     <Compile Include="Services\AutoPlannerService.cs" />
     <Compile Include="Services\Messaging\EventBus.cs" />
@@ -124,11 +126,13 @@
     <Compile Include="Services\BacktestService.cs" />
     <Compile Include="Services\ChromeSidecar.cs" />
     <Compile Include="Services\CoinbaseReadOnlyImportService.cs" />
+    <Compile Include="Services\DisabledExchangeClient.cs" />
     <Compile Include="Services\ExchangeProvider.cs" />
     <Compile Include="Services\ExchangeCredentialPolicy.cs" />
     <Compile Include="Services\ExchangeProviderAuditService.cs" />
     <Compile Include="Services\ExecutionCostModelService.cs" />
     <Compile Include="Services\ExecutionVenueScorer.cs" />
+    <Compile Include="Services\GeoBlockRegistry.cs" />
     <Compile Include="Services\FundingCarryDetector.cs" />
     <Compile Include="Services\HistoryService.cs" />
     <Compile Include="Services\IHistoryService.cs" />
@@ -143,6 +147,7 @@
     <Compile Include="Services\ResilientExchangeClient.cs" />
     <Compile Include="Services\SmartOrderRouter.cs" />
     <Compile Include="Services\SpreadDivergenceDetector.cs" />
+    <Compile Include="Services\StrictJsonPromptContract.cs" />
     <Compile Include="Services\StrategyExchangePolicyService.cs" />
     <Compile Include="Services\TimeFilterService.cs" />
     <Compile Include="Services\VenueHealthService.cs" />

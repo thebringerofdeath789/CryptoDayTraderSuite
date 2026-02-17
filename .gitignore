@@ -1,0 +1,50 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+[Bb]in/
+[Oo]bj/*
+!obj/*.ps1
+obj/tmp_*.ps1
+obj/runtime_*probe*.ps1
+obj/verify_*.ps1
+obj/*.out.txt
+
+# Test/results/runtime artifacts
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+obj/runtime_reports/
+obj/recover_*/
+obj/decompile_restore/
+
+# Logs and local diagnostics
+*.log
+*.tmp
+*.bak
+*.orig
+
+# Secrets and certificates
+*.pfx
+*.p12
+*.snk
+*.pem
+*.key
+*.crt
+
+# Environment / local config overrides
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/*.code-workspace

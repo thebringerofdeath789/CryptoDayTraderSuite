@@ -56,7 +56,7 @@ namespace CryptoDayTraderSuite.Util
                         if (!r.IsSuccessStatusCode) 
                         {
                             var msg = $"HTTP {(int)r.StatusCode}: {body}";
-                            Log.Debug($"GET {url} FAILED: {msg}");
+                            LogHttpFailure(url, "GET", msg, r.IsSuccessStatusCode, (int)r.StatusCode);
                             throw new HttpRequestException(msg);
                         }
                         Log.Trace($"GET {url} OK ({body.Length} bytes)");
@@ -64,9 +64,20 @@ namespace CryptoDayTraderSuite.Util
                     }
                 }
             }
+            catch (HttpRequestException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                Log.Error($"GET {url} EXCEPTION", ex);
+                if (IsTransient(ex))
+                {
+                    Log.Warn($"GET {url} transient exception: {ex.Message}");
+                }
+                else
+                {
+                    Log.Error($"GET {url} EXCEPTION", ex);
+                }
                 throw;
             }
         }
@@ -85,18 +96,15 @@ namespace CryptoDayTraderSuite.Util
                 if (!r.IsSuccessStatusCode)
                 {
                     var msg = $"HTTP {(int)r.StatusCode} {method} {url}: {body}";
-                    if (!string.IsNullOrEmpty(body) && body.IndexOf("ua-header", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        Log.Error("[Connection] ua-header mismatch detected: " + msg);
-                    }
-                    else
-                    {
-                        Log.Error("[Connection] Request failed: " + msg);
-                    }
+                    LogHttpFailure(url, method, msg, r.IsSuccessStatusCode, (int)r.StatusCode);
                     throw new HttpRequestException(msg);
                 }
                 Log.Trace($"SEND {method} {url} OK ({body.Length} bytes)");
                 return body;
+            }
+            catch (HttpRequestException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -104,6 +112,10 @@ namespace CryptoDayTraderSuite.Util
                 if (!string.IsNullOrEmpty(exMsg) && exMsg.IndexOf("ua-header", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     Log.Error($"[Connection] ua-header mismatch exception on {method} {url}", ex);
+                }
+                else if (IsTransient(ex))
+                {
+                    Log.Warn($"[Connection] Transient exception on {method} {url}: {ex.Message}");
                 }
                 else
                 {
@@ -157,6 +169,27 @@ namespace CryptoDayTraderSuite.Util
             if (ex == null || string.IsNullOrWhiteSpace(ex.Message)) return false;
             var msg = ex.Message.ToLowerInvariant();
             return msg.Contains("429") || msg.Contains("too many requests");
+        }
+
+        private static void LogHttpFailure(string url, string method, string message, bool isSuccessStatusCode, int statusCode)
+        {
+            if (!string.IsNullOrEmpty(message) && message.IndexOf("ua-header", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                Log.Error("[Connection] ua-header mismatch detected: " + message);
+                return;
+            }
+
+            var isClientError = statusCode >= 400 && statusCode < 500;
+            var urlLower = (url ?? string.Empty).ToLowerInvariant();
+            var bybitRequest = urlLower.Contains("bybit");
+
+            if (isClientError || bybitRequest)
+            {
+                Log.Warn("[Connection] Request failed: " + message);
+                return;
+            }
+
+            Log.Error("[Connection] Request failed: " + message);
         }
     }
 }

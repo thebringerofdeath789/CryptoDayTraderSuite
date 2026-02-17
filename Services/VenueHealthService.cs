@@ -25,7 +25,14 @@ namespace CryptoDayTraderSuite.Services
             public int ConsecutiveCircuitOpens;
         }
 
+        private sealed class DisabledVenueState
+        {
+            public DateTime DisabledAtUtc;
+            public string Reason;
+        }
+
         private readonly ConcurrentDictionary<string, VenueCounters> _counters = new ConcurrentDictionary<string, VenueCounters>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, DisabledVenueState> _disabledVenues = new ConcurrentDictionary<string, DisabledVenueState>(StringComparer.OrdinalIgnoreCase);
         private readonly TimeSpan _circuitOpenDuration = TimeSpan.FromSeconds(90);
         private readonly TimeSpan _maxCircuitOpenDuration = TimeSpan.FromMinutes(8);
         private readonly int _maxConsecutiveErrors = 3;
@@ -91,6 +98,7 @@ namespace CryptoDayTraderSuite.Services
         public bool IsCircuitOpen(string venue, DateTime utcNow)
         {
             if (string.IsNullOrWhiteSpace(venue)) return false;
+            if (IsVenueDisabled(venue)) return true;
             VenueCounters counters;
             if (!_counters.TryGetValue(venue, out counters)) return false;
 
@@ -114,16 +122,89 @@ namespace CryptoDayTraderSuite.Services
             return false;
         }
 
+        public bool IsVenueDisabled(string venue)
+        {
+            if (string.IsNullOrWhiteSpace(venue))
+            {
+                return false;
+            }
+
+            var key = venue.Trim();
+            return _disabledVenues.ContainsKey(key) || GeoBlockRegistry.IsDisabled(key);
+        }
+
+        public bool TryDisableVenue(string venue, string reason)
+        {
+            if (string.IsNullOrWhiteSpace(venue))
+            {
+                return false;
+            }
+
+            var normalizedVenue = venue.Trim();
+            var disabled = _disabledVenues.TryAdd(normalizedVenue, new DisabledVenueState
+            {
+                DisabledAtUtc = DateTime.UtcNow,
+                Reason = string.IsNullOrWhiteSpace(reason) ? "disabled" : reason.Trim()
+            });
+
+            if (disabled)
+            {
+                Log.Warn("[VenueHealth] Venue disabled venue=" + normalizedVenue + " reason=" + (reason ?? "disabled"));
+            }
+
+            GeoBlockRegistry.TryDisable(normalizedVenue, reason);
+
+            return disabled;
+        }
+
         public List<VenueHealthSnapshot> BuildSnapshots()
         {
             var now = DateTime.UtcNow;
             var snapshots = new List<VenueHealthSnapshot>();
 
-            foreach (var kvp in _counters)
+            var venues = new HashSet<string>(_counters.Keys, StringComparer.OrdinalIgnoreCase);
+            foreach (var disabledVenue in _disabledVenues.Keys)
             {
-                var venue = kvp.Key;
-                var counters = kvp.Value;
+                venues.Add(disabledVenue);
+            }
+
+            foreach (var venue in venues)
+            {
+                VenueCounters counters;
+                _counters.TryGetValue(venue, out counters);
+                DisabledVenueState disabledState;
+                _disabledVenues.TryGetValue(venue, out disabledState);
                 VenueHealthSnapshot snapshot;
+
+                if (disabledState != null)
+                {
+                    snapshot = new VenueHealthSnapshot
+                    {
+                        Venue = venue,
+                        ComputedAtUtc = now,
+                        TotalSamples = counters != null ? counters.TotalSamples : 0,
+                        SuccessSamples = counters != null ? counters.SuccessSamples : 0,
+                        ErrorSamples = counters != null ? counters.ErrorSamples : 0,
+                        StaleSamples = counters != null ? counters.StaleSamples : 0,
+                        SuccessRatio = 0d,
+                        StaleRatio = 1d,
+                        AvgRoundTripMs = 0d,
+                        HealthScore = 0d,
+                        IsDegraded = true,
+                        CircuitBreakerOpen = true,
+                        CircuitBreakerReason = disabledState.Reason,
+                        CircuitBreakerOpenedAtUtc = disabledState.DisabledAtUtc,
+                        CircuitBreakerReenableAtUtc = null
+                    };
+
+                    snapshots.Add(snapshot);
+                    continue;
+                }
+
+                if (counters == null)
+                {
+                    continue;
+                }
 
                 lock (counters)
                 {

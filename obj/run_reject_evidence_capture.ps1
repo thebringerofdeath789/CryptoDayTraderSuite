@@ -1,4 +1,4 @@
-param(
+﻿param(
     [int]$DurationSeconds = 390,
     [switch]$RunStrict,
     [switch]$SkipAutoRunPrecheck,
@@ -6,6 +6,7 @@ param(
     [switch]$UseFastProfileOverride,
     [switch]$AutoRepairBindings,
     [switch]$RunProviderProbeBeforeCert,
+    [switch]$AllowPartialExitCodeZero,
     [int]$ExternalRetryCount = 2,
     [int]$ExternalRetryDelaySeconds = 3,
     [int]$RuntimeCaptureAttempts = 2,
@@ -14,6 +15,20 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+$CaptureCiVersion = '1'
+$CaptureCiFields = 'result|decision|exit|strict|cycle_fresh|log_fresh|observed|default_exit|strict_exit|report'
+
+trap {
+    $message = if ($null -ne $_ -and $null -ne $_.Exception) { $_.Exception.Message } else { "unknown error" }
+    Write-Output ('UNHANDLED_ERROR=' + $message)
+    Write-Output 'CAPTURE_RESULT=PARTIAL'
+    Write-Output 'CAPTURE_DECISION=partial-unhandled-error'
+    Write-Output ('CI_VERSION=' + $CaptureCiVersion)
+    Write-Output ('CI_FIELDS=' + $CaptureCiFields)
+    Write-Output ('CI_SUMMARY=version=' + $CaptureCiVersion + ';result=PARTIAL;decision=partial-unhandled-error;exit=6;strict=' + ([int]$RunStrict.IsPresent) + ';cycle=-1;log=-1;observed=none;default_exit=-1;strict_exit=-1;report=none')
+    Complete-Result -Message 'RESULT:PARTIAL unhandled script error during reject evidence capture.' -Code 6 -IsPartial
+}
 
 if ($DurationSeconds -lt 60) {
     throw "DurationSeconds must be at least 60."
@@ -222,6 +237,69 @@ function Format-ObservedCounts {
     return ($parts -join ", ")
 }
 
+function Complete-Result {
+    param(
+        [string]$Message,
+        [int]$Code,
+        [switch]$IsPartial
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Message)) {
+        Write-Output $Message
+    }
+
+    Write-Output ('RESULT_EXIT_CODE=' + $Code)
+
+    if ($IsPartial.IsPresent -and $Code -ne 0 -and $AllowPartialExitCodeZero.IsPresent) {
+        Write-Output ('RESULT_EXIT_ORIGINAL=' + $Code)
+        Write-Output 'RESULT_EXIT_OVERRIDDEN=0 mode=allow-partial-exit-zero'
+        exit 0
+    }
+
+    exit $Code
+}
+
+function Get-FileAgeMinutes {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path $Path)) {
+        return -1
+    }
+
+    try {
+        $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+        return [int][Math]::Round(([DateTime]::Now - $item.LastWriteTime).TotalMinutes, 0)
+    }
+    catch {
+        return -1
+    }
+}
+
+function Emit-CaptureContract {
+    param(
+        [string]$Result,
+        [string]$Decision,
+        [int]$ExitCode,
+        [int]$CycleFresh,
+        [int]$LogFresh,
+        [string]$Observed,
+        [int]$DefaultExit,
+        [int]$StrictExit,
+        [string]$ReportPath
+    )
+
+    $resultText = if ([string]::IsNullOrWhiteSpace($Result)) { 'PARTIAL' } else { $Result.ToUpperInvariant() }
+    $decisionText = if ([string]::IsNullOrWhiteSpace($Decision)) { 'unknown' } else { $Decision.Trim().ToLowerInvariant() }
+    $observedText = if ([string]::IsNullOrWhiteSpace($Observed)) { 'none' } else { $Observed }
+    $reportText = if ([string]::IsNullOrWhiteSpace($ReportPath)) { 'none' } else { $ReportPath }
+
+    Write-Output ('CAPTURE_RESULT=' + $resultText)
+    Write-Output ('CAPTURE_DECISION=' + $decisionText)
+    Write-Output ('CI_VERSION=' + $CaptureCiVersion)
+    Write-Output ('CI_FIELDS=' + $CaptureCiFields)
+    Write-Output ('CI_SUMMARY=version=' + $CaptureCiVersion + ';result=' + $resultText + ';decision=' + $decisionText + ';exit=' + $ExitCode + ';strict=' + ([int]$RunStrict.IsPresent) + ';cycle=' + $CycleFresh + ';log=' + $LogFresh + ';observed=' + $observedText + ';default_exit=' + $DefaultExit + ';strict_exit=' + $StrictExit + ';report=' + $reportText)
+}
+
 Set-Location $RepoRoot
 
 if (-not $SkipAutoRunPrecheck.IsPresent) {
@@ -264,8 +342,8 @@ if (-not $SkipAutoRunPrecheck.IsPresent) {
         }
 
         if ($precheckExit -ne 0) {
-            Write-Output 'RESULT:PARTIAL Auto Run precheck failed; aborting capture.'
-            exit 5
+            Emit-CaptureContract -Result 'PARTIAL' -Decision 'partial-precheck-failed' -ExitCode 5 -CycleFresh -1 -LogFresh -1 -Observed 'none' -DefaultExit -1 -StrictExit -1 -ReportPath 'none'
+            Complete-Result -Message 'RESULT:PARTIAL Auto Run precheck failed; aborting capture.' -Code 5 -IsPartial
         }
     }
 }
@@ -278,6 +356,7 @@ if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out
 $profileStorePath = Join-Path $env:LOCALAPPDATA "CryptoDayTraderSuite\automode_profiles.json"
 $profileStoreBackupPath = $profileStorePath + ".capture.bak"
 $profileOverrideApplied = $false
+$profileOverrideRestored = $false
 
 if ($UseFastProfileOverride.IsPresent -and (Test-Path $profileStorePath)) {
     try {
@@ -335,6 +414,8 @@ $env:CDTS_AI_MODEL = 'auto'
 $env:CDTS_AI_PROPOSER_MODE = 'enabled'
 $env:CDTS_AUTOMODE_MAX_SYMBOLS = $AutoModeMaxSymbols.ToString()
 
+Write-Output ('RETRY_CONFIG=externalAttempts=' + $ExternalRetryCount + ',externalDelaySec=' + $ExternalRetryDelaySeconds + ',runtimeAttempts=' + $RuntimeCaptureAttempts + ',runtimeDelaySec=' + $RuntimeRetryDelaySeconds)
+
 $exePath = '.\bin\Debug_Verify\CryptoDayTraderSuite.exe'
 if (-not (Test-Path $exePath)) {
     $exePath = '.\bin\Debug\CryptoDayTraderSuite.exe'
@@ -369,6 +450,7 @@ for ($runtimeAttempt = 1; $runtimeAttempt -le $RuntimeCaptureAttempts; $runtimeA
         Start-Sleep -Seconds 8
         try {
             Move-Item -Path $profileStoreBackupPath -Destination $profileStorePath -Force
+            $profileOverrideRestored = $true
             Write-Output 'FAST_PROFILE_OVERRIDE_RESTORED=1'
         }
         catch {
@@ -453,6 +535,7 @@ $defaultCertExit = $defaultCertResult.ExitCode
 $defaultCertAttempts = $defaultCertResult.AttemptCount
 $defaultReportLine = ($defaultCertOutput -split "`r?`n" | Where-Object { $_ -like 'REPORT_JSON=*' } | Select-Object -Last 1)
 $defaultVerdictLine = ($defaultCertOutput -split "`r?`n" | Where-Object { $_ -like 'VERDICT=*' } | Select-Object -Last 1)
+$defaultReportPath = if (-not [string]::IsNullOrWhiteSpace($defaultReportLine) -and $defaultReportLine.StartsWith('REPORT_JSON=')) { $defaultReportLine.Substring(12) } else { '' }
 
 $strictCertOutput = ""
 $strictCertExit = 0
@@ -474,6 +557,8 @@ Write-Output ('CYCLE_JSON=' + $cyclePath)
 Write-Output ('CYCLE_IS_FRESH=' + ([int]$cycleIsFresh))
 Write-Output ('LOG_FILE=' + $logPath)
 Write-Output ('LOG_IS_FRESH=' + ([int]$logIsFresh))
+Write-Output ('CYCLE_AGE_MIN=' + (Get-FileAgeMinutes -Path $cyclePath))
+Write-Output ('LOG_AGE_MIN=' + (Get-FileAgeMinutes -Path $logPath))
 Write-Output ('RUNTIME_CAPTURE_ATTEMPTS_USED=' + $runtimeAttemptUsed)
 Write-Output ('RUNTIME_CAPTURE_ATTEMPTS_MAX=' + $RuntimeCaptureAttempts)
 Write-Output ('AUTOMODE_MAX_SYMBOLS=' + $AutoModeMaxSymbols)
@@ -500,19 +585,39 @@ if ($RunStrict.IsPresent) {
     Write-Output ('STRICT_CERT_EXIT=' + $strictCertExit)
 }
 
+if ($profileOverrideApplied) {
+    if (Test-Path $profileStoreBackupPath) {
+        try {
+            Move-Item -Path $profileStoreBackupPath -Destination $profileStorePath -Force
+            $profileOverrideRestored = $true
+            Write-Output 'FAST_PROFILE_OVERRIDE_RESTORED_FINAL=1 mode=final-restore'
+        }
+        catch {
+            Write-Output ('FAST_PROFILE_OVERRIDE_RESTORED_FINAL=0 error=' + $_.Exception.Message)
+        }
+    }
+    elseif ($profileOverrideRestored) {
+        Write-Output 'FAST_PROFILE_OVERRIDE_RESTORED_FINAL=1 mode=already-restored'
+    }
+    else {
+        Write-Output 'FAST_PROFILE_OVERRIDE_RESTORED_FINAL=0 reason=backup-not-found'
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($mergedObserved)) {
     if (-not $cycleIsFresh) {
-        Write-Output 'RESULT:PARTIAL no fresh cycle artifact detected; ensure Auto Run is enabled before capture.'
-        exit 4
+        Emit-CaptureContract -Result 'PARTIAL' -Decision 'partial-no-fresh-cycle' -ExitCode 4 -CycleFresh ([int]$cycleIsFresh) -LogFresh ([int]$logIsFresh) -Observed 'none' -DefaultExit $defaultCertExit -StrictExit $strictCertExit -ReportPath $defaultReportPath
+        Complete-Result -Message 'RESULT:PARTIAL no fresh cycle artifact detected; ensure Auto Run is enabled before capture.' -Code 4 -IsPartial
     }
-    Write-Output 'RESULT:PARTIAL no reject categories observed in fresh evidence window.'
-    exit 2
+
+    Emit-CaptureContract -Result 'PARTIAL' -Decision 'partial-no-reject-evidence' -ExitCode 2 -CycleFresh ([int]$cycleIsFresh) -LogFresh ([int]$logIsFresh) -Observed 'none' -DefaultExit $defaultCertExit -StrictExit $strictCertExit -ReportPath $defaultReportPath
+    Complete-Result -Message 'RESULT:PARTIAL no reject categories observed in fresh evidence window.' -Code 2 -IsPartial
 }
 
 if ($RunStrict.IsPresent -and $strictCertExit -ne 0) {
-    Write-Output 'RESULT:PARTIAL reject evidence observed, strict certification still failing on other gates.'
-    exit 3
+    Emit-CaptureContract -Result 'PARTIAL' -Decision 'partial-strict-gates-failed' -ExitCode 3 -CycleFresh ([int]$cycleIsFresh) -LogFresh ([int]$logIsFresh) -Observed $mergedObserved -DefaultExit $defaultCertExit -StrictExit $strictCertExit -ReportPath $defaultReportPath
+    Complete-Result -Message 'RESULT:PARTIAL reject evidence observed, strict certification still failing on other gates.' -Code 3 -IsPartial
 }
 
-Write-Output 'RESULT:PASS reject evidence observed and certification executed.'
-exit 0
+Emit-CaptureContract -Result 'PASS' -Decision 'pass-reject-evidence-observed' -ExitCode 0 -CycleFresh ([int]$cycleIsFresh) -LogFresh ([int]$logIsFresh) -Observed $mergedObserved -DefaultExit $defaultCertExit -StrictExit $strictCertExit -ReportPath $defaultReportPath
+Complete-Result -Message 'RESULT:PASS reject evidence observed and certification executed.' -Code 0

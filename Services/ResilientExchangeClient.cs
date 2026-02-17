@@ -15,14 +15,16 @@ namespace CryptoDayTraderSuite.Services
         private readonly IExchangeClient _inner;
         private readonly int _maxRetries;
         private readonly int _baseDelayMs;
+        private readonly string _serviceKey;
 
         public string Name => _inner.Name;
 
-        public ResilientExchangeClient(IExchangeClient inner, int maxRetries = 3, int baseDelayMs = 500)
+        public ResilientExchangeClient(IExchangeClient inner, int maxRetries = 3, int baseDelayMs = 500, string serviceKey = null)
         {
             _inner = inner;
             _maxRetries = maxRetries;
             _baseDelayMs = baseDelayMs;
+            _serviceKey = string.IsNullOrWhiteSpace(serviceKey) ? _inner.Name : serviceKey;
         }
 
         public void SetCredentials(string apiKey, string apiSecret, string passphrase = null)
@@ -50,15 +52,29 @@ namespace CryptoDayTraderSuite.Services
             return ExecuteWithRetry(() => _inner.GetFeesAsync());
         }
 
-        public Task<OrderResult> PlaceOrderAsync(OrderRequest order)
+        public async Task<OrderResult> PlaceOrderAsync(OrderRequest order)
         {
-            // Be careful retrying orders - only if we are sure it wasn't placed.
-            // For safety in this simpler implementation, we might NOT retry PlaceOrder to avoid duplicates,
-            // OR we retry only on connection failures where the request definitely didn't leave.
-            // Given the risk of verifying execution, we will skip retry for PlaceOrderAsync 
-            // unless we can verify state. For now, let's pass specific "false" to retry.
-            // Actually, network glitch could mean it posted. Safest is NO RETRY on PlaceOrder.
-            return _inner.PlaceOrderAsync(order);
+            try
+            {
+                return await _inner.PlaceOrderAsync(order).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                if (GeoBlockRegistry.TryDisableFromException(_serviceKey, ex, "place-order"))
+                {
+                    return new OrderResult
+                    {
+                        OrderId = string.Empty,
+                        Accepted = false,
+                        Filled = false,
+                        FilledQty = 0m,
+                        AvgFillPrice = 0m,
+                        Message = "service-disabled: " + GeoBlockRegistry.GetDisableReason(_serviceKey)
+                    };
+                }
+
+                throw;
+            }
         }
 
         public Task<bool> CancelOrderAsync(string orderId)
@@ -79,6 +95,11 @@ namespace CryptoDayTraderSuite.Services
                 }
                 catch (Exception ex)
                 {
+                    if (GeoBlockRegistry.TryDisableFromException(_serviceKey, ex, "resilient-call"))
+                    {
+                        return CreateGeoDisabledResult<T>();
+                    }
+
                     if (attempt > _maxRetries || !IsTransient(ex))
                     {
                         throw;
@@ -104,6 +125,55 @@ namespace CryptoDayTraderSuite.Services
             // Assume 500/502/503/504 in message logic if strictly parsing, 
             // but for now, base types are the main catch.
             return false;
+        }
+
+        private T CreateGeoDisabledResult<T>()
+        {
+            var type = typeof(T);
+            if (type == typeof(List<string>))
+            {
+                return (T)(object)new List<string>();
+            }
+
+            if (type == typeof(List<Candle>))
+            {
+                return (T)(object)new List<Candle>();
+            }
+
+            if (type == typeof(Ticker))
+            {
+                return (T)(object)new Ticker { Time = DateTime.UtcNow };
+            }
+
+            if (type == typeof(FeeSchedule))
+            {
+                return (T)(object)new FeeSchedule
+                {
+                    MakerRate = 0m,
+                    TakerRate = 0m,
+                    Notes = "service-disabled: " + GeoBlockRegistry.GetDisableReason(_serviceKey)
+                };
+            }
+
+            if (type == typeof(bool))
+            {
+                return (T)(object)false;
+            }
+
+            if (type == typeof(OrderResult))
+            {
+                return (T)(object)new OrderResult
+                {
+                    OrderId = string.Empty,
+                    Accepted = false,
+                    Filled = false,
+                    FilledQty = 0m,
+                    AvgFillPrice = 0m,
+                    Message = "service-disabled: " + GeoBlockRegistry.GetDisableReason(_serviceKey)
+                };
+            }
+
+            return default(T);
         }
     }
 }

@@ -51,6 +51,9 @@ namespace CryptoDayTraderSuite.Services
         private const decimal DefaultFundingMinCarryBps = 2m;
         private const decimal DefaultFundingMinBasisStability = 0.55m;
         private const decimal DefaultFundingMaxAgeMinutes = 20m;
+        private const decimal DefaultAiProposerMinConfidence = 0.55m;
+        private const decimal DefaultAiProposerMinRMultiple = 1.50m;
+        private const decimal DefaultAiProposerMaxEntryDriftR = 0.75m;
 
         public sealed class ProposalDiagnostics
         {
@@ -624,15 +627,7 @@ namespace CryptoDayTraderSuite.Services
                     };
 
                     var json = UtilCompat.JsonSerialize(reviewPayload);
-                    var prompt = "You are a deterministic crypto risk manager. Review the trade payload and decide approve/veto. "
-                        + "Use only provided data. Return ONLY valid JSON (no markdown, no prose, no code fences). "
-                        + "Schema: {\"bias\":\"Bullish\"|\"Bearish\"|\"Neutral\",\"approve\":true|false,\"reason\":\"one short sentence\",\"confidence\":0.0-1.0,\"SuggestedLimit\":0.0}. "
-                        + "Return exactly one top-level JSON object with exactly these keys: bias, approve, reason, confidence, SuggestedLimit. "
-                        + "Do NOT wrap in result/data/response/output/payload keys, and do NOT return an array. "
-                        + "Wrap your final JSON exactly as: " + JsonStartMarker + "{...}" + JsonEndMarker + ". "
-                        + "If evidence is weak or conflicting, set approve=false and SuggestedLimit=0. "
-                        + "If approve=true, SuggestedLimit must be >0 only when it improves execution; otherwise set 0. "
-                        + "JSON Data: " + json;
+                    var prompt = BuildAiReviewPrompt(json);
                     
                     var aiRaw = await _sidecar.QueryAIAsync(prompt);
                     if (string.IsNullOrWhiteSpace(aiRaw))
@@ -651,8 +646,7 @@ namespace CryptoDayTraderSuite.Services
                     var aiResp = ParseAiResponse(cleanJson);
                     if (aiResp == null)
                     {
-                        var repairSchema = "{\"bias\":\"Bullish\"|\"Bearish\"|\"Neutral\",\"approve\":true|false,\"reason\":\"one short sentence\",\"confidence\":0.0-1.0,\"SuggestedLimit\":0.0}";
-                        var retryRaw = await QueryStrictJsonRepairAsync(repairSchema, cleanJson);
+                        var retryRaw = await QueryStrictJsonRepairAsync(AiJsonSchemas.PlannerReviewSchema, cleanJson);
                         if (!string.IsNullOrWhiteSpace(retryRaw))
                         {
                             cleanJson = NormalizeAiResponseText(retryRaw);
@@ -666,6 +660,12 @@ namespace CryptoDayTraderSuite.Services
                         {
                             Util.Log.Info("[AutoPlanner] AI vetoed trade.");
                             return new ProposalDiagnostics { ReasonCode = "ai-veto", ReasonMessage = "AI vetoed trade (json)." };
+                        }
+
+                        if (!StrictJsonPromptContract.MatchesExactTopLevelObjectContract(cleanJson, AiJsonSchemas.PlannerReviewKeys))
+                        {
+                            Util.Log.Warn("[AutoPlanner] AI review approve rejected: strict key-order contract mismatch.");
+                            return new ProposalDiagnostics { ReasonCode = "ai-veto", ReasonMessage = "AI review invalid strict contract." };
                         }
 
                         Util.Log.Info("[AutoPlanner] AI approved trade.");
@@ -701,8 +701,8 @@ namespace CryptoDayTraderSuite.Services
 
                         if (approved.HasValue && approved.Value)
                         {
-                            Util.Log.Info("[AutoPlanner] AI approved trade (text parse fallback).");
-                            plan.Note += " [AI Approved: parsed from text]";
+                            Util.Log.Warn("[AutoPlanner] AI text-approve fallback rejected: strict JSON contract required for approval.");
+                            return new ProposalDiagnostics { ReasonCode = "ai-veto", ReasonMessage = "AI review strict JSON contract required for approval." };
                         }
                         else
                         {
@@ -1334,19 +1334,20 @@ namespace CryptoDayTraderSuite.Services
                     recentCandles = recent,
                     windowSummaries = proposerWindowSummaries,
                     liveSignals = liveSignals,
-                    rule = "Only propose trades that align with at least one provided live strategy signal."
+                    constraints = new
+                    {
+                        minConfidence = GetEnvDecimal("CDTS_AI_PROPOSER_MIN_CONFIDENCE", DefaultAiProposerMinConfidence),
+                        minRMultiple = GetEnvDecimal("CDTS_AI_PROPOSER_MIN_R", DefaultAiProposerMinRMultiple),
+                        requireReasonMetricOrPriceReference = true,
+                        requireReasonRiskNote = true,
+                        reasonMaxChars = 220,
+                        requireSignalAlignment = true
+                    },
+                    rule = "Only propose trades that align with at least one provided live strategy signal and satisfy constraints."
                 };
 
                 var contextJson = UtilCompat.JsonSerialize(payload);
-                var prompt = "You are an execution-constrained crypto planner. Analyze the payload and either propose one trade or reject. "
-                    + "Use only provided data. Return ONLY valid JSON (no markdown, no prose, no code fences). "
-                    + "Schema: {\"approve\":true|false,\"symbol\":\"...\",\"side\":\"Buy\"|\"Sell\",\"entry\":0.0,\"stop\":0.0,\"target\":0.0,\"strategyHint\":\"...\",\"reason\":\"one short sentence\",\"confidence\":0.0-1.0}. "
-                    + "Return exactly one top-level JSON object with exactly these keys: approve, symbol, side, entry, stop, target, strategyHint, reason, confidence. "
-                    + "Do NOT wrap in result/data/response/output/payload keys, and do NOT return an array. "
-                    + "Wrap your final JSON exactly as: " + JsonStartMarker + "{...}" + JsonEndMarker + ". "
-                    + "If uncertain, set approve=false and set numeric fields to 0. "
-                    + "When approve=true, stop/entry/target must satisfy valid risk geometry for the selected side. "
-                    + "JSON Data: " + contextJson;
+                var prompt = BuildAiProposerPrompt(contextJson);
 
                 Util.Log.Info("[AutoPlanner] Starting AI proposer query.");
                 var aiRaw = await _sidecar.QueryAIAsync(prompt);
@@ -1360,8 +1361,7 @@ namespace CryptoDayTraderSuite.Services
                 var proposal = ParseAiTradeProposal(clean);
                 if (proposal == null)
                 {
-                    var proposerSchema = "{\"approve\":true|false,\"symbol\":\"...\",\"side\":\"Buy\"|\"Sell\",\"entry\":0.0,\"stop\":0.0,\"target\":0.0,\"strategyHint\":\"...\",\"reason\":\"one short sentence\",\"confidence\":0.0-1.0}";
-                    var retryRaw = await QueryStrictJsonRepairAsync(proposerSchema, clean);
+                    var retryRaw = await QueryStrictJsonRepairAsync(AiJsonSchemas.PlannerProposerSchema, clean);
                     if (!string.IsNullOrWhiteSpace(retryRaw))
                     {
                         clean = NormalizeAiResponseText(retryRaw);
@@ -1378,6 +1378,26 @@ namespace CryptoDayTraderSuite.Services
                 if (!proposal.Approve)
                 {
                     Util.Log.Info("[AutoPlanner] AI proposer rejected trade: " + (proposal.Reason ?? "No reason provided"));
+                    return null;
+                }
+
+                if (!StrictJsonPromptContract.MatchesExactTopLevelObjectContract(clean, AiJsonSchemas.PlannerProposerKeys))
+                {
+                    Util.Log.Warn("[AutoPlanner] AI proposer rejected: strict key-order contract mismatch.");
+                    return null;
+                }
+
+                if (proposal.Confidence < 0m || proposal.Confidence > 1m)
+                {
+                    Util.Log.Warn("[AutoPlanner] AI proposer rejected: confidence is out of 0..1 range.");
+                    return null;
+                }
+
+                var minProposalConfidence = GetEnvDecimal("CDTS_AI_PROPOSER_MIN_CONFIDENCE", DefaultAiProposerMinConfidence);
+                if (proposal.Confidence < minProposalConfidence)
+                {
+                    Util.Log.Info("[AutoPlanner] AI proposer rejected: confidence below minimum. confidence="
+                        + proposal.Confidence.ToString("0.000") + " min=" + minProposalConfidence.ToString("0.000"));
                     return null;
                 }
 
@@ -1437,6 +1457,22 @@ namespace CryptoDayTraderSuite.Services
                     }
                 }
 
+                var rewardDistance = Math.Abs(target - entry);
+                if (rewardDistance <= MinRiskDistance)
+                {
+                    Util.Log.Warn("[AutoPlanner] AI proposer rejected: reward distance is too small.");
+                    return null;
+                }
+
+                var rrMultiple = rewardDistance / distance;
+                var minRMultiple = GetEnvDecimal("CDTS_AI_PROPOSER_MIN_R", DefaultAiProposerMinRMultiple);
+                if (rrMultiple < minRMultiple)
+                {
+                    Util.Log.Info("[AutoPlanner] AI proposer rejected: R multiple below minimum. rr="
+                        + rrMultiple.ToString("0.000") + " min=" + minRMultiple.ToString("0.000"));
+                    return null;
+                }
+
                 if (_engine != null)
                 {
                     if (_engine.GlobalBias == MarketBias.Bearish && proposedSide == OrderSide.Buy)
@@ -1459,6 +1495,25 @@ namespace CryptoDayTraderSuite.Services
                 if (matchedSignal == null)
                 {
                     Util.Log.Info("[AutoPlanner] AI proposer rejected: no live strategy signal aligns with proposed side.");
+                    return null;
+                }
+
+                var signalRiskDistance = Math.Abs(matchedSignal.Entry - matchedSignal.Stop);
+                if (signalRiskDistance > MinRiskDistance)
+                {
+                    var entryDriftR = Math.Abs(entry - matchedSignal.Entry) / signalRiskDistance;
+                    var maxEntryDriftR = GetEnvDecimal("CDTS_AI_PROPOSER_MAX_ENTRY_DRIFT_R", DefaultAiProposerMaxEntryDriftR);
+                    if (entryDriftR > maxEntryDriftR)
+                    {
+                        Util.Log.Info("[AutoPlanner] AI proposer rejected: entry drift exceeds allowed R drift. driftR="
+                            + entryDriftR.ToString("0.000") + " max=" + maxEntryDriftR.ToString("0.000"));
+                        return null;
+                    }
+                }
+
+                if (!IsReasonDataBacked(proposal.Reason, entry, stop, target, matchedSignal, rrMultiple))
+                {
+                    Util.Log.Info("[AutoPlanner] AI proposer rejected: reason lacks concrete evidence/risk context.");
                     return null;
                 }
 
@@ -1861,13 +1916,7 @@ namespace CryptoDayTraderSuite.Services
             var previous = (previousResponse ?? string.Empty).Trim();
             if (previous.Length > 1200) previous = previous.Substring(0, 1200);
 
-            var prompt = "Your last response was not valid for parser consumption. Return ONLY strict JSON with no markdown/prose/code fences. "
-                + "Schema: " + schema + ". "
-                + "Return exactly one top-level JSON object using only the schema keys. "
-                + "Do NOT return arrays and do NOT wrap under result/data/response/output/payload. "
-                + "Wrap your final JSON exactly as: " + JsonStartMarker + "{...}" + JsonEndMarker + ". "
-                + "Do not wrap the JSON in quotes. Use plain object JSON only. "
-                + "Previous response to fix: " + previous;
+            var prompt = StrictJsonPromptContract.BuildRepairPrompt(schema, JsonStartMarker, JsonEndMarker, previous);
 
             try
             {
@@ -1878,6 +1927,44 @@ namespace CryptoDayTraderSuite.Services
                 Util.Log.Warn("[AutoPlanner] AI strict-json retry failed: " + ex.Message);
                 return string.Empty;
             }
+        }
+
+        private string BuildAiReviewPrompt(string jsonPayload)
+        {
+            var instructions = new[]
+            {
+                "If evidence is weak or conflicting, set approve=false and SuggestedLimit=0.",
+                "If approve=true, SuggestedLimit must be >0 only when it improves execution; otherwise set 0."
+            };
+
+            return StrictJsonPromptContract.BuildPrompt(
+                "You are a deterministic crypto risk manager. Review the trade payload and decide approve/veto.",
+                AiJsonSchemas.PlannerReviewSchema,
+                AiJsonSchemas.PlannerReviewKeysCsv,
+                JsonStartMarker,
+                JsonEndMarker,
+                instructions,
+                jsonPayload);
+        }
+
+        private string BuildAiProposerPrompt(string jsonPayload)
+        {
+            var instructions = new[]
+            {
+                "If uncertain, set approve=false and set numeric fields to 0.",
+                "When approve=true, stop/entry/target must satisfy valid risk geometry for the selected side and R multiple must be >= constraints.minRMultiple.",
+                "When approve=true, confidence must be >= constraints.minConfidence.",
+                "Reason must be exactly one sentence under constraints.reasonMaxChars and include (a) at least one concrete metric/price reference from payload and (b) one explicit risk-control note (stop/risk/R)."
+            };
+
+            return StrictJsonPromptContract.BuildPrompt(
+                "You are an execution-constrained crypto planner. Analyze the payload and either propose one trade or reject.",
+                AiJsonSchemas.PlannerProposerSchema,
+                AiJsonSchemas.PlannerProposerKeysCsv,
+                JsonStartMarker,
+                JsonEndMarker,
+                instructions,
+                jsonPayload);
         }
 
         private string NormalizeAiResponseText(string text)
@@ -2103,6 +2190,89 @@ namespace CryptoDayTraderSuite.Services
             }
 
             return false;
+        }
+
+        private bool IsReasonDataBacked(string reason, decimal entry, decimal stop, decimal target, LiveSignalEvidence matchedSignal, decimal rrMultiple)
+        {
+            var text = (reason ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            if (text.Length < 24 || text.Length > 220) return false;
+
+            var lower = text.ToLowerInvariant();
+            var genericPhrases = new[]
+            {
+                "signal says",
+                "math checks out",
+                "looks good",
+                "good enough",
+                "positive expectancy",
+                "higher win rate"
+            };
+            if (genericPhrases.Any(p => lower == p || lower.StartsWith(p + " ") || lower.EndsWith(" " + p)))
+            {
+                return false;
+            }
+
+            var hasNumber = lower.Any(char.IsDigit);
+            var hasMetricToken = ContainsAny(lower,
+                "vwap", "rsi", "atr", "expectancy", "win rate", "winrate", "sample", "price", "entry", "stop", "target", "rr", "2r", "1.5r");
+            var hasRiskToken = ContainsAny(lower,
+                "stop", "risk", "invalidate", "invalidates", "if broken", "r multiple", "rr", "loss");
+
+            var referencesSignal = matchedSignal != null
+                && !string.IsNullOrWhiteSpace(matchedSignal.Strategy)
+                && lower.Contains(matchedSignal.Strategy.ToLowerInvariant());
+
+            var referencesPlanPrice = ReferencesPrice(text, entry)
+                || ReferencesPrice(text, stop)
+                || ReferencesPrice(text, target);
+
+            var referencesR = ReferencesRMultiple(text, rrMultiple);
+
+            if (!(hasRiskToken && (hasNumber || hasMetricToken || referencesPlanPrice || referencesR || referencesSignal)))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool ContainsAny(string value, params string[] terms)
+        {
+            if (string.IsNullOrWhiteSpace(value) || terms == null) return false;
+            foreach (var term in terms)
+            {
+                if (string.IsNullOrWhiteSpace(term)) continue;
+                if (value.Contains(term)) return true;
+            }
+
+            return false;
+        }
+
+        private bool ReferencesPrice(string reason, decimal price)
+        {
+            var text = (reason ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(text) || price <= 0m) return false;
+
+            var forms = new[]
+            {
+                price.ToString("0.##"),
+                price.ToString("0.###"),
+                price.ToString("0.####"),
+                Math.Round(price, 0).ToString("0")
+            };
+
+            return forms.Any(f => !string.IsNullOrWhiteSpace(f) && text.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private bool ReferencesRMultiple(string reason, decimal rr)
+        {
+            var text = (reason ?? string.Empty).ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(text) || rr <= 0m) return false;
+
+            var rrRounded1 = Math.Round(rr, 1).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+            var rrRounded2 = Math.Round(rr, 2).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+            return text.Contains(rrRounded1 + "r") || text.Contains(rrRounded2 + "r") || text.Contains("rr") || text.Contains("r multiple");
         }
 
         private async Task<List<Candle>> GetCandlesSafeAsync(string productId, int granMinutes, DateTime startUtc, DateTime endUtc, string scope)

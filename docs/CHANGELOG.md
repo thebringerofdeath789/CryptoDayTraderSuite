@@ -1,4 +1,262 @@
-# Changelog
+﻿# Changelog
+
+## [AI Contract Hardening] - Shared Schemas + Deterministic Key-Order Acceptance Gates - 2026-02-17
+
+### Changed
+- **Shared AI Schemas Added**: Added `Services/AiJsonSchemas.cs` and centralized planner/governor strict JSON schemas and expected top-level key orders.
+- **Deterministic Contract Validator Added**: Extended `Services/StrictJsonPromptContract.cs` with top-level exact key-order validation (`MatchesExactTopLevelObjectContract`) using JSON structure-aware parsing.
+- **Planner Approval Fail-Closed Tightened**: Updated `Services/AutoPlannerService.cs` so AI approval is accepted only when strict review/proposer JSON key-order contracts match expected schemas; text-approval fallback is now rejected for approval paths.
+- **Governor Parsing Preference Tightened**: Updated `Services/AIGovernor.cs` to prefer strict key-order contract parsing before flexible contract fallbacks.
+- **Project Wiring Updated**: Added `Services/AiJsonSchemas.cs` to compile includes in `CryptoDayTraderSuite.csproj`.
+
+### Verified
+- **Diagnostics**: No file-level errors in modified AI contract files (`AiJsonSchemas`, `StrictJsonPromptContract`, `AutoPlannerService`, `AIGovernor`, project include changes).
+- **Build Status**: Full Debug verify build currently blocked by unrelated pre-existing UI compile issue in `UI/AutoModeControl.Designer.cs` (`CS0115: 'AutoModeControl.Dispose(bool)': no suitable method found to override`).
+
+## [Ops Script Contracts] - Deterministic Exit Marker Rollout - 2026-02-17
+
+### Changed
+- **Contract Checker Markers Added**: Updated `Util/check_multiexchange_contract.ps1` with deterministic completion marker emission (`RESULT_EXIT_CODE`, `CONTRACT_FINAL_EXIT`) and trap-backed deterministic fail output.
+- **Matrix Validator Markers Added**: Updated `Util/validate_automode_matrix.ps1` to emit deterministic matrix failure/success keys (`MATRIX_RESULT`, `MATRIX_ERROR`, `MATRIX_EXIT_CODE`) and explicit `RESULT_EXIT_CODE` on all terminal paths.
+- **Provider Probe Markers Added**: Updated `Util/run_provider_public_api_probe.ps1` to emit deterministic probe completion/failure keys (`PROBE_EXIT_CODE`, `RESULT_EXIT_CODE`, `PROBE_ERROR`) including unhandled-failure trap path.
+- **Matrix Failure Path Fix**: Corrected matrix script terminal failure emission to avoid `Write-Error` short-circuiting deterministic markers when `$ErrorActionPreference='Stop'`.
+
+### Verified
+- **Contract Checker**: `Util/check_multiexchange_contract.ps1 -Strict` emits `CONTRACT_RESULT=PASS`, `RESULT_EXIT_CODE=0`, `CONTRACT_FINAL_EXIT=0`.
+- **Matrix Validator**: `Util/validate_automode_matrix.ps1` emits `MATRIX_RESULT=FAIL`, `MATRIX_ERROR=...`, `RESULT_EXIT_CODE=1`, `MATRIX_EXIT_CODE=1` for failing matrix evidence.
+- **Provider Probe**: `Util/run_provider_public_api_probe.ps1` emits `PROBE_VERDICT=FAIL`, `RESULT_EXIT_CODE=1`, `PROBE_EXIT_CODE=1` under current geo-constrained provider conditions.
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after script-contract hardening.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_202452.txt` remains baseline (`VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`).
+
+## [AI Prompt Contract] - Shared Strict-JSON Utility Across Planner + Governor - 2026-02-17
+
+### Changed
+- **Shared Utility Added**: Added `Services/StrictJsonPromptContract.cs` to centralize strict JSON prompt envelope construction for AI calls (`BuildPrompt`, `BuildRepairPrompt`).
+- **Planner Migration Completed**: Updated `Services/AutoPlannerService.cs` to use shared prompt utility for both proposer/reviewer prompt generation and strict-repair prompt generation.
+- **Governor Migration Completed**: Updated `Services/AIGovernor.cs` to use shared prompt utility for bias prompt generation and strict-repair prompt generation.
+- **Project Wiring Updated**: Added `Services/StrictJsonPromptContract.cs` to compile includes in `CryptoDayTraderSuite.csproj`.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after shared prompt utility extraction.
+
+## [Ops Tooling] - Reject-Capture CI Decision Contract Emission - 2026-02-17
+
+### Changed
+- **Capture Decision Contract Added**: Updated `obj/run_reject_evidence_capture.ps1` to emit deterministic machine-parseable decision lines on terminal outcomes: `CAPTURE_RESULT`, `CAPTURE_DECISION`, `CI_VERSION`, `CI_FIELDS`, and `CI_SUMMARY`.
+- **Coverage Expanded Across End States**: Contract emission now covers precheck failure, no-fresh-cycle partial, no-evidence partial, strict-gate partial, pass, and unhandled-error paths.
+- **CI Routing Simplified**: `CI_SUMMARY` now provides a one-line key/value outcome envelope (`result`, `decision`, `exit`, strict flag, freshness state, observed categories, cert exits, report path) to avoid brittle log parsing.
+
+### Verified
+- **Targeted Runtime Validation**: `obj/runtime_reports/reject_capture_verify_ci_summary.txt` shows stable partial contract output (`CAPTURE_DECISION=partial-no-fresh-cycle`) with deterministic `CI_SUMMARY` fields.
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after contract emission updates.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_202200.txt` remains baseline (`VERDICT=PARTIAL`, `STRICT_FAILURE_COUNT=0`, `STRICT_FAILURE_NAMES=none`).
+
+## [AI Runtime + Connectivity] - Provider Rotation Default + Chrome Focus + HTTP Log Noise Hardening - 2026-02-17
+
+### Changed
+- **Default Provider Rotation Restored**: Updated `Services/ChromeSidecar.cs` public `QueryAIAsync(...)` path to start from round-robin provider selection (`ChatGPT` → `Gemini` → `Claude`) instead of pinning to the currently connected provider.
+- **Chrome Focus-Steal Reduced**: Updated sidecar-managed Chrome launch to use non-shell process start (`UseShellExecute=false`) and enforce post-launch window state (hidden or minimized) so auto-launched Chrome no longer pops above active work unexpectedly.
+- **HTTP Error Spam Reduced**: Updated `Util/HttpUtil.cs` to avoid duplicate logs for `HttpRequestException`, classify transient transport exceptions as warnings, and downgrade expected client/Bybit request failures to warning-level connection telemetry while preserving hard-error logging for severe failures.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after sidecar and HTTP logging hardening updates.
+
+## [AI Governor Maintainability] - Reusable Strict-JSON Prompt Template Helpers - 2026-02-17
+
+### Changed
+- **Governor Prompt Builder Centralized**: Refactored `Services/AIGovernor.cs` to generate bias-classification prompts through reusable helpers (`BuildStrictJsonPrompt`, `BuildGovernorBiasPrompt`) instead of inline prompt string composition.
+- **Governor Repair Prompt Centralized**: Added `BuildStrictJsonRepairPrompt` and switched strict repair flow to use the same marker/wrapper restrictions as the primary governor prompt.
+- **Schema Constant Shared in Governor**: Added `GovernorBiasSchema` constant and reused it in both initial query and strict-repair retry paths to reduce contract drift.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after governor prompt-template refactor.
+
+## [Ops Reliability] - Reject Capture Trap Completion-Contract Alignment - 2026-02-17
+
+### Changed
+- **Trap Completion Aligned**: Updated `obj/run_reject_evidence_capture.ps1` so top-level unhandled-error `trap` now calls `Complete-Result` instead of directly exiting.
+- **Policy-Aware Exit Behavior Preserved**: Unhandled failures now honor the same deterministic completion contract as regular partial outcomes, including `-AllowPartialExitCodeZero` behavior and explicit result markers.
+
+### Verified
+- **Runtime Capture (Fast Mode)**: Output includes deterministic partial/override markers (`RESULT:PARTIAL`, `RESULT_EXIT_CODE=4`, `RESULT_EXIT_ORIGINAL=4`, `RESULT_EXIT_OVERRIDDEN=0 mode=allow-partial-exit-zero`) when partial override switch is enabled.
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after script hardening.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_201942.txt` remains baseline (`VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`).
+
+## [AI Planner Maintainability] - Reusable Strict-JSON Prompt Template Helpers - 2026-02-17
+
+### Changed
+- **Prompt Builder Centralized**: Refactored `Services/AutoPlannerService.cs` to construct AI prompts through reusable helpers (`BuildStrictJsonPrompt`, `BuildAiReviewPrompt`, `BuildAiProposerPrompt`) instead of inline string assembly.
+- **Schema Constants Centralized**: Added shared schema constants (`AiReviewSchema`, `AiProposerSchema`) and switched proposer/reviewer strict-repair calls to those constants.
+- **Contract Drift Risk Reduced**: Review/proposer prompts now share a consistent strict-JSON envelope contract (exact keys, wrapper markers, anti-wrapper rules), making future prompt policy updates one-place changes.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify_PromptTemplate\\ /t:Build /v:minimal` succeeds (alternate output path used because `bin\\Debug_Verify\\CryptoDayTraderSuite.exe` was process-locked during verification).
+
+## [AI Planner Reliability] - Data-Backed Proposer Contract + Deterministic Acceptance Gates - 2026-02-17
+
+### Changed
+- **Prompt Contract Tightened**: Updated `Services/AutoPlannerService.cs` AI proposer payload/prompt to include explicit constraints (`minConfidence`, `minRMultiple`, reason evidence requirements) and require concrete metric/price references plus risk-control context in one-sentence reasons.
+- **Confidence Gate Added**: AI-proposed trades now fail closed when confidence is outside `0..1` or below `CDTS_AI_PROPOSER_MIN_CONFIDENCE` (default `0.55`).
+- **R-Multiple Gate Added**: AI-proposed trades now fail closed when computed reward-to-risk is below `CDTS_AI_PROPOSER_MIN_R` (default `1.50`).
+- **Signal Drift Guard Added**: AI-proposed entry is now bounded against matched live-signal entry via `CDTS_AI_PROPOSER_MAX_ENTRY_DRIFT_R` (default `0.75R`) to prevent off-signal proposals.
+- **Reason Quality Gate Added**: Proposal verification now rejects generic/non-data-backed reasons that lack concrete evidence/risk language.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after proposer hardening updates.
+
+## [Ops Tooling] - Reject-Capture Partial Exit Override + Freshness Age Telemetry - 2026-02-17
+
+### Changed
+- **Optional Partial Exit Override Added**: Updated `obj/run_reject_evidence_capture.ps1` with `-AllowPartialExitCodeZero` so expected partial outcomes (`no fresh cycle` / `no reject categories` / strict-gate partial) can emit full partial diagnostics while returning process exit `0` for automation workflows.
+- **Deterministic Exit Markers Added**: Centralized result exits now always emit `RESULT_EXIT_CODE`, and when overridden also emit `RESULT_EXIT_ORIGINAL` + `RESULT_EXIT_OVERRIDDEN=0 mode=allow-partial-exit-zero`.
+- **Freshness-Age Diagnostics Added**: Capture output now includes `CYCLE_AGE_MIN` and `LOG_AGE_MIN` to accelerate stale-cycle triage without manual file timestamp inspection.
+
+### Verified
+- **Targeted Runtime Validation**: `obj/runtime_reports/reject_capture_verify_partial_exit_zero.txt` confirms partial-no-fresh-cycle path emits full diagnostics and returns `EXIT=0` when `-AllowPartialExitCodeZero` is enabled.
+
+## [Routing Reliability] - Global Endpoint Geo-Disable and Error-Suppression Fallback - 2026-02-17
+
+### Changed
+- **Global Geo-Disable Registry Added**: Added `Services/GeoBlockRegistry.cs` to track endpoint-scoped geo-blocked services across the running app session using normalized service aliases.
+- **Non-Throwing Disabled Client Added**: Added `Services/DisabledExchangeClient.cs` and wired `Services/ExchangeProvider.cs` to return it whenever a service is geo-disabled, preventing repeated exception cascades for blocked endpoints.
+- **Resilience Geo Handling Generalized**: Updated `Services/ResilientExchangeClient.cs` to detect geo-block signatures (`HTTP 403`, `forbidden`, restricted-region variants), disable the affected service alias, and return safe default results for quote/product/candle/fee/cancel flows instead of repeatedly throwing.
+- **Quote Fanout Honors Global Disable**: Updated `Services/MultiVenueQuoteService.cs` and `Services/VenueHealthService.cs` so globally disabled endpoints are skipped in venue fanout and reflected in health-disable checks.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after global geo-disable integration.
+
+## [Ops Reliability] - Reject Capture Deterministic Unhandled Error Signaling - 2026-02-17
+
+### Changed
+- **Unhandled Error Trap Added**: Updated `obj/run_reject_evidence_capture.ps1` with a top-level `trap` that converts unhandled exceptions into deterministic capture telemetry output and explicit failure semantics.
+- **Deterministic Failure Contract**: Unhandled script failures now emit `UNHANDLED_ERROR=<message>` and `RESULT:PARTIAL unhandled script error during reject evidence capture.` with explicit exit code `6`.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after script hardening.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_200928.txt` remains baseline (`VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`).
+
+## [Ops Tooling] - Reject-Capture Final Restore Telemetry Semantics - 2026-02-17
+
+### Changed
+- **Final Restore Marker Always Emitted**: Updated `obj/run_reject_evidence_capture.ps1` so `FAST_PROFILE_OVERRIDE_RESTORED_FINAL` is emitted whenever fast profile override is active, including normal successful paths where runtime restore already consumed the backup file.
+- **Deterministic Restore Modes Added**: Final marker now distinguishes `mode=already-restored` (runtime restore succeeded earlier) and `mode=final-restore` (fallback restore executed at script end), while preserving explicit failure telemetry (`FAST_PROFILE_OVERRIDE_RESTORED_FINAL=0 ...`).
+
+### Notes
+- This pass is orchestration telemetry hardening only; no trade execution logic changed.
+
+## [Broker Reliability] - Shared Message Formatter Consolidation - 2026-02-17
+
+### Changed
+- **Shared Formatter Added**: Added `Brokers/BrokerMessageFormatter.cs` to centralize broker success/failure message formatting (`BuildSuccessMessage`, `BuildFailureMessage`).
+- **Project Wiring Updated**: Added `Brokers/BrokerMessageFormatter.cs` compile include in `CryptoDayTraderSuite.csproj`.
+- **Broker Delegation Applied**: Updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, `Brokers/OkxBroker.cs`, and `Brokers/PaperBroker.cs` so local formatter methods delegate to shared implementation.
+
+### Verified
+- **Diagnostics**: No errors in modified broker files and project file.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_195304.txt` remains baseline (`VERDICT=PARTIAL`, `StrictFailureClass=NONE`, `StrictFailures=count=0`, `StrictPolicyDecision=allow-geo-partial`).
+
+## [Exchange Reliability] - Deterministic Open-Order Row Normalization - 2026-02-17
+
+### Changed
+- **Binance Row Normalization Added**: Updated `Exchanges/BinanceClient.cs` cancel paths to resolve order id/symbol via dedicated row helpers, unify canceled-like status checks through one predicate, and clear cached order-symbol bindings during cancel-all row processing.
+- **Bybit Symbol Resolution Expanded**: Updated `Exchanges/BybitClient.cs` cancel-order lookup to resolve symbol/product/instrument aliases via a dedicated helper before normalization and cancel request construction.
+- **OKX Per-Row Instrument Usage Added**: Updated `Exchanges/OkxClient.cs` cancel-all loop to resolve order ids via helper and use per-row normalized instrument ids (with scoped fallback) for deterministic cancel payload construction.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after deterministic row-normalization updates.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_195118.txt` remains baseline (`VERDICT=PARTIAL`, `STRICT_FAILURE_COUNT=0`, `STRICT_FAILURE_NAMES=none`).
+
+## [Coinbase Reliability] - Open-Order Filter Fail-Closed Tightening - 2026-02-17
+
+### Changed
+- **Ambiguous Row Fail-Closed**: Updated `Exchanges/CoinbaseExchangeClient.cs` `FilterOpenOrders(...)` to stop treating blank/unknown status rows as implicitly open.
+- **Explicit Open Flags Supported**: Added explicit boolean open detection (`open`, `is_open`/`isOpen`, `active`, `pending` variants) so open rows without status text are still retained.
+- **Open Status Coverage Expanded**: `IsOpenLikeStatus(...)` now also recognizes `OPENED`, `PENDING_OPEN`, `QUEUED`, and `RESTING` while maintaining existing open-like statuses.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after Coinbase open-order filter hardening.
+
+## [Exchange Reliability] - Cancel-Order Resolution + Key Lookup Hardening - 2026-02-17
+
+### Changed
+- **Bybit Cancel Resolution Hardened**: Updated `Exchanges/BybitClient.cs` so `CancelOrderAsync(...)` now requires successful open-order query semantics before lookup, resolves order ids from variant key shapes, and normalizes symbol before issuing cancel requests.
+- **OKX Cancel Resolution Hardened**: Updated `Exchanges/OkxClient.cs` so `CancelOrderAsync(...)` now fails closed when pending-order query is not successful, resolves order/instrument identifiers from variant key shapes, and normalizes instrument ids before cancel requests.
+- **Binance Cancel Status Alignment**: Updated `Exchanges/BinanceClient.cs` cancel success recognition to include `EXPIRED_IN_MATCH` in terminal canceled-like states.
+- **Case-Insensitive Key Reads Added**: Added case-insensitive key lookup fallback in `GetString(...)` for `Exchanges/BinanceClient.cs`, `Exchanges/BybitClient.cs`, and `Exchanges/OkxClient.cs` to tolerate payload casing drift.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after exchange reliability hardening updates.
+
+## [Broker Reliability] - Validation Success Contract Normalization - 2026-02-17
+
+### Changed
+- **Validation Success Structured**: Updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` so `ValidateTradePlanAsync(...)` success returns categorized `validation` output via `BuildSuccessMessage("validation", "ok")` instead of raw `"ok"`.
+- **Paper Broker Contract Aligned**: Updated `Brokers/PaperBroker.cs` to use structured success/failure helpers and normalized message categories across validate/place/cancel paths (`validation`, `accepted`, `canceled`), including direct validation tuple passthrough in `PlaceOrderAsync(...)`.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after success-contract normalization.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_193757.txt` remains `VERDICT=PARTIAL` with strict gates clear (`STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`).
+
+## [Broker Reliability] - Structured Validation and Constraint Failure Taxonomy - 2026-02-17
+
+### Changed
+- **Validation Guard Categorization**: Updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` so `ValidateTradePlanAsync(...)` input/geometry guard failures consistently emit categorized `validation` results via `BuildFailureMessage(...)`.
+- **Constraint Rule Categorization**: In the same brokers, symbol-constraint resolution failures and step/tick/min/max/notional rule violations now emit categorized `constraints` results via `BuildFailureMessage(...)`.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after structured failure taxonomy normalization.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_191903.txt` remains `VERDICT=PARTIAL` with strict gates clear (`StrictFailureClass=NONE`, `StrictFailures=count=0`, `StrictPolicyDecision=allow-geo-partial`).
+
+## [Auto Mode UI Diagnostics] - Routing/Venue Footer Telemetry - 2026-02-17
+
+### Changed
+- UI/AutoModeControl.cs manual propose path now updates routing/venue footer diagnostics from proposal batch results (chosen/alternate venues, execution modes, routing-unavailable count, and policy/regime/circuit counters).
+- Added proposal-note tag extraction for routed diagnostics ([Route=...], [Alt=...], [ExecMode=...]) and proposal reason-code classification into routing/venue health counters.
+- RefreshLatestTelemetrySummary() now initializes and updates routing/venue diagnostic rows from latest cycle telemetry (RoutingChosenVenues, RoutingAlternateVenues, RoutingExecutionModes, RoutingUnavailableCount, PolicyHealthBlockedCount, RegimeBlockedCount, CircuitBreakerObservedCount).
+- Footer diagnostic labels are created and attached at runtime via EnsureDiagnosticsSummaryLabels() to avoid designer drift while preserving existing Auto Mode layout.
+
+### Verified
+- **Build**: msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal succeeds.
+- **Strict Certification**: task strict-cert-once remains baseline (VERDICT=PARTIAL, STRICT_FAILURE_COUNT=0, STRICT_FAILURE_NAMES=none).
+## [Broker Reliability] - Cancel-All Fail-Closed Hardening - 2026-02-17
+
+### Changed
+- **Client Fail-Closed Guards Added**: Updated `Exchanges/BinanceClient.cs`, `Exchanges/BybitClient.cs`, and `Exchanges/OkxClient.cs` cancel-all paths to reject invalid normalized symbols and enforce stricter structured success checks.
+- **OKX Pending Query Gated**: `Exchanges/OkxClient.cs` `CancelAllOpenOrdersAsync(...)` now requires pending-order query success (`code=0` + payload validity) before evaluating cancel loop results, preventing fail-open `true` outcomes on failed pending queries.
+- **Bybit Row Success Parsing Hardened**: `Exchanges/BybitClient.cs` now evaluates cancel-all row success across `success` and status-code variants (`sCode`/`retCode`) and fails closed on malformed rows.
+- **Broker Cancel Telemetry Standardized**: Updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, and `Brokers/OkxBroker.cs` cancel success/failure details to include normalized symbol scope; updated `Brokers/CoinbaseExchangeBroker.cs` to fail closed on invalid provided symbol normalization and on partial cancel outcomes, with deterministic `scope/attempted/canceled/failed` details.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after cancel-all fail-closed hardening updates.
+
+## [Repository Hygiene] - Temporary Probe De-Scoping + PR Checklist Guardrails - 2026-02-17
+
+### Changed
+- **Temporary Probe Patterns Ignored**: Tightened `.gitignore` to exclude root `obj` temporary probe/output patterns (`obj/tmp_*.ps1`, `obj/runtime_*probe*.ps1`, `obj/verify_*.ps1`, `obj/*.out.txt`) while keeping curated root `obj/*.ps1` scripts versionable.
+- **Temporary Probe Scripts De-Tracked**: Removed tracked ad-hoc probe scripts from git index (`tmp_*`, runtime probe, verify probe paths under root `obj/`) so local experimentation files no longer leak into source control.
+- **PR Hygiene Gate Added**: Added `.github/pull_request_template.md` with explicit security/repository-hygiene checklist requirements (no secrets, no local IDE state, no build/runtime artifacts, `.gitignore` update check).
+
+### Notes
+- This pass is process/repository hardening only and does not change trading runtime behavior.
+
+## [Documentation + Repository Hygiene] - README Overhaul and Git Ignore Hardening - 2026-02-17
+
+### Changed
+- **README Modernized**: Rewrote `README.md` to reflect current runtime architecture, exchange/broker scope, setup/run workflows, Auto Mode + certification operations, AI sidecar usage, and security/repo hygiene expectations.
+- **Ignore Policy Added**: Added root `.gitignore` to block IDE state (`.vs/`), user-local project metadata (`*.user`), build outputs (`bin/`, `obj/` artifacts), runtime report noise, and credential/certificate file types (`*.pfx`, `*.pem`, `*.key`, etc.).
+- **Tracked Noise De-Scoped**: Removed previously tracked generated/artifact files from git index (including `.vs/`, `bin/`, `obj` generated/runtime outputs, `CryptoDayTraderSuite.csproj.user`, and `key.pfx`) so they no longer risk accidental publication.
+
+### Notes
+- This cleanup is source-control hygiene focused and does not change runtime trading behavior.
+
+## [Broker Reliability] - Place Validation Passthrough Normalization - 2026-02-17
+
+### Changed
+- **Validation Passthrough Applied**: Updated `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` so `PlaceOrderAsync(...)` now returns failed `ValidateTradePlanAsync(...)` tuples directly (`return validation`) instead of re-wrapping with a second `validation` prefix.
+
+### Verified
+- **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify\\ /t:Build /v:minimal` succeeds after place validation passthrough normalization.
+- **Strict Certification**: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_183610.txt` remains `VERDICT=PARTIAL` with strict gates clear (`STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`).
 
 ## [Broker Reliability] - Outcome Taxonomy Consistency Pass - 2026-02-17
 
@@ -288,6 +546,7 @@
 - **Policy Decision Added**: Strict telemetry now includes deterministic action classification (`non-strict`, `promote`, `allow-geo-partial`, `collect-more-evidence`, `refresh-freshness`, `fix-build`, `fix-failures`) across JSON (`Summary.Strict.PolicyDecision`), TXT (`StrictPolicyDecision: ...`), and stdout (`STRICT_POLICY_DECISION=...`).
 - **One-Line CI Contract Added**: Runner now emits `CI_SUMMARY=verdict=...;strict=...;class=...;decision=...;fails=...;manifest=...` and mirrors it in report outputs (`Summary.Strict.CiSummary`, `CiSummary:`) so automation can parse one key instead of multiple fields.
 - **Contract Version Marker Added**: Runner now emits `CI_VERSION=1`, mirrors version in report outputs (`Summary.Strict.CiVersion`, `CiVersion:`), and prefixes `CI_SUMMARY` with `version=1` to allow safe parser/schema evolution.
+- **Reject-Capture Runtime Hardening Finalized**: `obj/run_reject_evidence_capture.ps1` now emits retry configuration telemetry (`RETRY_CONFIG=externalAttempts=...,externalDelaySec=...,runtimeAttempts=...,runtimeDelaySec=...`) and performs a final profile-store backup restore attempt (`FAST_PROFILE_OVERRIDE_RESTORED_FINAL=...`) before exit to reduce lingering config override risk on long-run partial/failure outcomes.
 
 ### Verified
 - **Backward Compatibility**: Legacy strict invocation with `-Require*` flags remains supported.
@@ -397,10 +656,10 @@
 ### Verified
 - **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\\Debug_Verify_AccountInsights\\ /t:Build /v:minimal` succeeds after account-insights integration.
 
-## [Audit] - Full A→F Code Audit Tracker Update - 2026-02-17
+## [Audit] - Full Aâ†’F Code Audit Tracker Update - 2026-02-17
 
 ### Changed
-- **Independent Audit Tracker Completed**: Updated `CODE_AUDIT_TRACKER.md` with completed Phase D, Phase E, and Phase F sections (A→F now complete).
+- **Independent Audit Tracker Completed**: Updated `CODE_AUDIT_TRACKER.md` with completed Phase D, Phase E, and Phase F sections (Aâ†’F now complete).
 - **Static Correctness Findings Logged**: Added concrete defects for execution-safety bypass surface (`UI/AutoModeForm.cs`), exchange correctness issues (`Exchanges/BitstampClient.cs`, `Exchanges/KrakenClient.cs`), and responsiveness hotspots (`UI/KeyEditDialog.cs`, broker validation paths).
 - **Orphan/Legacy Surface Findings Logged**: Added dormant legacy UI and duplicate-folder findings for `UI/MainForm_Menu.cs`, `UI/MainForm_Hooks.cs`, `UI/MainForm_ExtraButtons.cs`, and `NewFolder2/`.
 - **Final Readiness Verdict Logged**: Added consolidated severity totals and final readiness verdict (`PARTIAL / NOT READY for strict production confidence`) with remediation order.
@@ -890,7 +1149,7 @@
 ## [Exchanges] - Binance Cancel Fast-Path Symbol Cache - 2026-02-17
 
 ### Changed
-- **Cancel Fast-Path Added**: Updated `Exchanges/BinanceClient.cs` `CancelOrderAsync` to attempt direct symbol-scoped cancel first when an orderId→symbol mapping is already known.
+- **Cancel Fast-Path Added**: Updated `Exchanges/BinanceClient.cs` `CancelOrderAsync` to attempt direct symbol-scoped cancel first when an orderIdâ†’symbol mapping is already known.
 - **Order Symbol Cache Added**: Added in-memory order symbol cache population on successful `PlaceOrderAsync` responses and fallback open-order discovery to avoid repeated full `openOrders` scans for known orders.
 - **Fallback Behavior Preserved**: Existing full open-order scan path remains as a safe fallback when symbol is unknown or cached cancel attempt fails.
 
@@ -931,11 +1190,11 @@
 ### Verified
 - **Build**: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /t:Build /v:minimal` succeeds after Coinbase credential normalization changes.
 
-## [Ops Tooling] - Automatic Policy-Backed Strategy×Exchange Row Evidence Emission - 2026-02-17
+## [Ops Tooling] - Automatic Policy-Backed StrategyÃ—Exchange Row Evidence Emission - 2026-02-17
 
 ### Changed
 - **Row Evidence Auto-Generation Added**: Updated `Util/run_multiexchange_certification.ps1` to emit `StrategyExchangePolicyEvidence` artifacts (`obj/runtime_reports/strategy_exchange_evidence/strategy_exchange_policy_evidence_*.json`) before matrix assembly.
-- **Policy/Provider-Derived Row Classification**: Generated rows are classified from runtime policy contracts (`Services/StrategyExchangePolicyService.cs`) and latest provider probe classes (`PASS`, `ENV-CONSTRAINT`, `INTEGRATION-ERROR`) so each strategy×exchange row has explicit evidence.
+- **Policy/Provider-Derived Row Classification**: Generated rows are classified from runtime policy contracts (`Services/StrategyExchangePolicyService.cs`) and latest provider probe classes (`PASS`, `ENV-CONSTRAINT`, `INTEGRATION-ERROR`) so each strategyÃ—exchange row has explicit evidence.
 - **Certification Check Added**: Runner now records `Policy-backed row evidence artifact` as a deterministic check with generated artifact filename.
 - **Runbook/Tracker Sync**: Updated `docs/ops/MultiExchange_Certification_Runner.md` and `PROGRESS_TRACKER.md` to reflect automatic row-evidence generation semantics.
 
@@ -1014,10 +1273,10 @@
 ## [Services/UI] - GC19.3 Policy Matrix + GC19.5 Funding Attribution Completion - 2026-02-17
 
 ### Changed
-- **Runtime Policy Matrix Added**: Added `Services/StrategyExchangePolicyService.cs` as explicit strategy×exchange policy source with deterministic policy decisions and reject codes (`policy-matrix-blocked`, `policy-health-blocked`, `policy-venue-unknown`, `regime-mismatch`).
+- **Runtime Policy Matrix Added**: Added `Services/StrategyExchangePolicyService.cs` as explicit strategyÃ—exchange policy source with deterministic policy decisions and reject codes (`policy-matrix-blocked`, `policy-health-blocked`, `policy-venue-unknown`, `regime-mismatch`).
 - **Planner Policy Enforcement Wired**: Updated `Services/AutoPlannerService.cs` to evaluate policy before selecting a candidate plan, return deterministic policy reject diagnostics when blocked, and append selected policy rationale tags to emitted plan notes and AI review payload execution context.
 - **Funding Source Tag Completion**: Planner funding-carry note telemetry now includes `FundingSource`, enabling downstream execution/realized attribution continuity.
-- **Funding Executed→Realized Attribution Completed**: Updated `UI/AutoModeControl.cs` to parse and carry funding telemetry from proposal note to execution records and protective close records (`funding-phase:executed|realized`, realized funding PnL tag).
+- **Funding Executedâ†’Realized Attribution Completed**: Updated `UI/AutoModeControl.cs` to parse and carry funding telemetry from proposal note to execution records and protective close records (`funding-phase:executed|realized`, realized funding PnL tag).
 - **Composition Root Wiring**: Updated `Program.cs` to inject `FundingCarryDetector` and `StrategyExchangePolicyService` into `AutoPlannerService`.
 - **Project File Sync**: Updated `CryptoDayTraderSuite.csproj` to compile `Services/StrategyExchangePolicyService.cs`.
 - **Roadmap/Tracker Sync**: Updated `ROADMAP.md` and `PROGRESS_TRACKER.md` to mark `G19.3`/`GC19.3` and `G19.5`/`GC19.5` complete.
@@ -1028,10 +1287,10 @@
 ## [Ops Tooling] - GC19.6 Evidence-Backed Certification Rows - 2026-02-17
 
 ### Changed
-- **Synthetic Matrix Projection Removed**: Updated `Util/run_multiexchange_certification.ps1` to derive strategy × exchange row status from row-level runtime/backtest evidence artifacts instead of projecting a single global matrix status.
+- **Synthetic Matrix Projection Removed**: Updated `Util/run_multiexchange_certification.ps1` to derive strategy Ã— exchange row status from row-level runtime/backtest evidence artifacts instead of projecting a single global matrix status.
 - **Per-Row Evidence Fields Added**: Certification report rows now include explicit evidence fields (`EvidenceRef`, `EvidenceSource`, `Detail`) in both JSON output and TXT summary.
 - **Row Evidence Discovery Added**: Runner now consumes row evidence from `-RowEvidenceDir`, `obj/runtime_reports/strategy_exchange_evidence`, `obj/runtime_reports/multiexchange/row_evidence`, and compatible cycle artifacts when they contain explicit row entries.
-- **Strict Missing-Evidence Gate Added**: Strict mode now deterministically fails when any mandatory strategy × exchange row lacks evidence coverage.
+- **Strict Missing-Evidence Gate Added**: Strict mode now deterministically fails when any mandatory strategy Ã— exchange row lacks evidence coverage.
 - **Docs/Tracker/Roadmap Sync**: Updated `docs/ops/MultiExchange_Certification_Runner.md`, `docs/ops/MultiExchange_Certification_Matrix.md`, `ROADMAP.md` (`G19.6`/`GC19.6`), and `PROGRESS_TRACKER.md`.
 
 ### Notes
@@ -1051,7 +1310,7 @@
 
 ### Changed
 - **Roadmap Gap Closure Added**: Updated `ROADMAP.md` with a new `Phase 19 Gap-Closure Addendum (Comprehensive Audit 2026-02-16)` to track implementation work that was not explicitly covered by prior Phase 19 checklists.
-- **Unplanned Work Captured as Explicit Tasks**: Added new tracked work for market-structure data contract completion (`IExchangeClient` + normalized DTOs), spot+perps scope completion, strategy×exchange runtime rule-matrix enforcement, funding-carry runtime wiring, fee-tier/rebate realism, and evidence-backed certification matrix generation.
+- **Unplanned Work Captured as Explicit Tasks**: Added new tracked work for market-structure data contract completion (`IExchangeClient` + normalized DTOs), spot+perps scope completion, strategyÃ—exchange runtime rule-matrix enforcement, funding-carry runtime wiring, fee-tier/rebate realism, and evidence-backed certification matrix generation.
 - **Documentation Alignment Tasks Added**: Added explicit reconciliation tasks to align stale/contradictory docs with code reality and separate `Implemented` vs `Target` capability states in multi-exchange planning docs.
 - **Progress Tracker Synced**: Updated `PROGRESS_TRACKER.md` to include the comprehensive gap-mapping milestone.
 
@@ -1106,7 +1365,7 @@
 ### Changed
 - **One-Command Certification Runner Added**: Added `Util/run_multiexchange_certification.ps1` to generate deterministic multi-exchange certification verdict artifacts (`PASS`/`PARTIAL`/`FAIL`) in one command.
 - **Timestamped Artifact Output**: Runner now emits paired JSON/TXT evidence files under `obj/runtime_reports/multiexchange` with check-level status details.
-- **Matrix + Reject Summaries**: Reports include strategy × exchange status rows and reject-category counts (`fees-kill`, `slippage-kill`, `routing-unavailable`, `no-signal`, `ai-veto`, `bias-blocked`) from latest runtime logs.
+- **Matrix + Reject Summaries**: Reports include strategy Ã— exchange status rows and reject-category counts (`fees-kill`, `slippage-kill`, `routing-unavailable`, `no-signal`, `ai-veto`, `bias-blocked`) from latest runtime logs.
 - **Lock-Safe Build Validation**: Runner build check uses `OutDir=bin\\Debug_Verify\\` to avoid false failures from default output binary locks.
 - **Ops Runbook Added**: Added `docs/ops/MultiExchange_Certification_Runner.md` and indexed it in `docs/index.md`.
 - **Certification Matrix/Checklist Sync**: Updated `docs/ops/MultiExchange_Certification_Matrix.md`, `docs/features/trading/MultiExchange_Execution_Checklist.md`, `ROADMAP.md`, and `PROGRESS_TRACKER.md` to reflect C19-12 tooling completion progress.
@@ -1775,7 +2034,7 @@
 - **Build Status**: `MSBuild CryptoDayTraderSuite.csproj /t:Build /p:Configuration=Debug` succeeds with 0 warnings and 0 errors.
 - **Solution Build**: `MSBuild CryptoDayTraderSuite.sln /t:Build /p:Configuration=Debug` succeeds with 0 warnings and 0 errors.
 - **Runtime Smoke**: Launched `bin\\Debug\\CryptoDayTraderSuite.exe` with `CDTS_LOG_LEVEL=debug`, tailed latest log (`%LocalAppData%\\CryptoDayTraderSuite\\logs\\log_20260216_36.txt`), and observed normal startup/governor/sidecar activity (`AI Governor Started`, `Connected via CDP`, `Starting analysis cycle`) with no immediate error entries in the sampled tail.
-- **Runtime Duration Proof (5+ min)**: Timed run executed from `2026-02-16T23:44:30.3526143Z` to `2026-02-16T23:49:36.3042055Z` (≈`305.95s`), exceeding the 5-minute minimum requirement.
+- **Runtime Duration Proof (5+ min)**: Timed run executed from `2026-02-16T23:44:30.3526143Z` to `2026-02-16T23:49:36.3042055Z` (â‰ˆ`305.95s`), exceeding the 5-minute minimum requirement.
 
 ## [Phase 18] - Track A2 Modal Reduction + Sidebar Collapse Guard - 2026-02-16
 
@@ -2100,7 +2359,7 @@
 ### Changed
 - **Provider Fan-Out**: Multi-provider query path now includes `ChatGPT`, `Gemini`, and `Claude`.
 - **Provider Detection/Provisioning**: Sidecar now detects Claude tabs, can auto-open `https://claude.ai/new`, and resolves provider metadata/source labels for Claude.
-- **Claude Inject/Read Selectors**: Added provider-specific prompt injection and response-read selectors for Claude’s composer/chat surface.
+- **Claude Inject/Read Selectors**: Added provider-specific prompt injection and response-read selectors for Claudeâ€™s composer/chat surface.
 
 ### Verified
 - **Build**: `MSBuild CryptoDayTraderSuite.csproj /t:Build /p:Configuration=Debug` succeeded with 0 errors.
@@ -2118,7 +2377,7 @@
 ### Verified
 - **Build**: `MSBuild CryptoDayTraderSuite.csproj /t:Build /p:Configuration=Debug` succeeded with 0 errors.
 - **Runtime**: Governor cycle captured both providers in one run (`Model response captured` for ChatGPT and Gemini), then computed consensus (`Sources: ChatGPT ...; Gemini ... | Consensus: Neutral`).
-- **Planner AI Review**: Programmatic `AutoPlannerService` Scan→Propose sweep verified AI review execution on both providers, including `[AutoPlanner] Starting AI review`, sidecar prompt injection/response capture, and approval-veto parse paths.
+- **Planner AI Review**: Programmatic `AutoPlannerService` Scanâ†’Propose sweep verified AI review execution on both providers, including `[AutoPlanner] Starting AI review`, sidecar prompt injection/response capture, and approval-veto parse paths.
 
 ## [Phase 15] - AutoMode Pair Selection & Popular Pair Priority - 2026-02-16
 
@@ -2427,6 +2686,7 @@
 ### Removed
 - **Legacy Static Code**: Deleted `HistoryStore.cs`, `KeyRegistry.cs`, `AccountRegistry.cs`, `ProfileStore.cs`, `TimeFilters.cs`.
 - **Redundant Utilities**: Deleted `KeyStore.cs`, `JsonUtil.cs`.
+
 
 
 

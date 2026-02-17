@@ -1412,12 +1412,43 @@ try {
     }
 
     $recommendedNextAction = "Fix FAIL checks first; re-run certification runner after remediation."
-    $failedChecks = @($checks | Where-Object { $_.Status -eq "FAIL" })
-    $strictFailureChecks = @($failedChecks | Where-Object {
-        [string]$_.Name -like "Strict requirement:*"
-    })
-    $strictFailureNames = @($strictFailureChecks | ForEach-Object { [string]$_.Name })
+    $failedChecks = @($checks | Where-Object { [string]::Equals(([string]$_.Status).Trim(), "FAIL", [System.StringComparison]::OrdinalIgnoreCase) })
+    $strictFailureChecks = @()
+    if ($strictRequested) {
+        foreach ($failedCheck in $failedChecks) {
+            $failedName = ([string]$failedCheck.Name).Trim()
+            $isStrictFailure = $false
+
+            if ($failedName -like "Strict requirement:*") {
+                $isStrictFailure = $true
+            }
+            elseif ($strictGateBuild -and [string]::Equals($failedName, "Build", [System.StringComparison]::OrdinalIgnoreCase)) {
+                $isStrictFailure = $true
+            }
+            elseif ($strictGateMatrix -and [string]::Equals($failedName, "AutoMode matrix artifact", [System.StringComparison]::OrdinalIgnoreCase)) {
+                $isStrictFailure = $true
+            }
+            elseif ($strictGateProvider -and (
+                [string]::Equals($failedName, "Provider public API probe artifacts", [System.StringComparison]::OrdinalIgnoreCase) -or
+                [string]::Equals($failedName, "Spot+perps coverage", [System.StringComparison]::OrdinalIgnoreCase)
+            )) {
+                $isStrictFailure = $true
+            }
+            elseif ($strictGateReject -and [string]::Equals($failedName, "Reject category evidence", [System.StringComparison]::OrdinalIgnoreCase)) {
+                $isStrictFailure = $true
+            }
+
+            if ($isStrictFailure) {
+                $strictFailureChecks += ,$failedCheck
+            }
+        }
+    }
+    $strictFailureNames = @($strictFailureChecks | ForEach-Object { ([string]$_.Name).Trim() } | Select-Object -Unique)
     $strictFailureCount = $strictFailureNames.Count
+    if ($strictRequested -and $verdict -eq "FAIL" -and $strictFailureCount -eq 0 -and $failedChecks.Count -gt 0) {
+        $strictFailureNames = @($failedChecks | ForEach-Object { ([string]$_.Name).Trim() } | Select-Object -Unique)
+        $strictFailureCount = $strictFailureNames.Count
+    }
     $strictFailureNamesText = if ($strictFailureCount -gt 0) { ($strictFailureNames -join ",") } else { "none" }
     $hasBuildStrictFailure = $strictFailureNames -contains "Strict requirement: build"
     $freshnessStrictFailures = @($failedChecks | Where-Object {

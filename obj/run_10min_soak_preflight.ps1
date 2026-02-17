@@ -1,5 +1,15 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
+function Complete-Result {
+    param(
+        [int]$Code
+    )
+
+    Write-Output ('RESULT_EXIT_CODE=' + $Code)
+    Write-Output ('PRECHECK_EXIT_CODE=' + $Code)
+    exit $Code
+}
+
 Set-Location "c:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite"
 
 function Get-ChromePath {
@@ -45,7 +55,7 @@ $chromePath = Get-ChromePath
 if (-not $chromePath) {
     Write-Output 'RESULT:CHROME_FOUND=0'
     Write-Output 'RESULT:PRECHECK_FAILED=chrome-not-found'
-    exit 1
+    Complete-Result -Code 1
 }
 
 $userData = Join-Path $env:LOCALAPPDATA 'CryptoSidecar'
@@ -117,7 +127,7 @@ if (-not $after) {
 
 if (-not $after) {
     Write-Output 'RESULT:NO_LOG'
-    exit 0
+    Complete-Result -Code 0
 }
 
 $f = $after.FullName
@@ -143,3 +153,5 @@ Write-Output ('RESULT:HTTP_429=' + (CountPattern -Path $f -Pattern '429' -Simple
 Select-String -Path $f -Pattern 'ChromeSidecar|AIGovernor|Starting AI review|AI vetoed|Auto cycle complete|paper fill|Prompt injection result|Prompt injection failed|Prompt injection did not submit|Response polling timed out|Provider response stalled|No AI tab found|Opened fallback tab|429' |
     Select-Object -Last 120 |
     ForEach-Object { $_.Line }
+
+Complete-Result -Code 0

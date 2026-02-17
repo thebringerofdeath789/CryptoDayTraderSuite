@@ -7,6 +7,23 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Complete-Result {
+    param(
+        [int]$Code
+    )
+
+    Write-Output ('RESULT_EXIT_CODE=' + $Code)
+    Write-Output ('CONTRACT_FINAL_EXIT=' + $Code)
+    exit $Code
+}
+
+trap {
+    $message = if ($null -ne $_ -and $null -ne $_.Exception) { $_.Exception.Message } else { 'unknown error' }
+    Write-Output ('CONTRACT_ERROR=' + $message)
+    Write-Output 'CONTRACT_RESULT=FAIL'
+    Complete-Result -Code 1
+}
+
 $resolvedRepo = (Resolve-Path $RepoRoot).Path
 Set-Location $resolvedRepo
 
@@ -81,8 +98,8 @@ if ($RequireZeroExit.IsPresent -and $exitCode -ne 0) { $pass = $false }
 
 if ($pass) {
     Write-Output 'CONTRACT_RESULT=PASS'
-    exit 0
+    Complete-Result -Code 0
 }
 
 Write-Output 'CONTRACT_RESULT=FAIL'
-exit 1
+Complete-Result -Code 1

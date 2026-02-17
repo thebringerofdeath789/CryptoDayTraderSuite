@@ -332,6 +332,11 @@ namespace CryptoDayTraderSuite.Exchanges
             var pendingReq = BuildSignedRequest(HttpMethod.Get, "/api/v5/trade/orders-pending", string.Empty);
             var pendingJson = await HttpUtil.SendAsync(pendingReq).ConfigureAwait(false);
             var pendingRoot = UtilCompat.JsonDeserialize<Dictionary<string, object>>(pendingJson);
+            if (!IsOkxSuccess(pendingRoot))
+            {
+                return false;
+            }
+
             var pending = ToObjectArray(pendingRoot != null && pendingRoot.ContainsKey("data") ? pendingRoot["data"] : null);
 
             string instId = string.Empty;
@@ -339,8 +344,8 @@ namespace CryptoDayTraderSuite.Exchanges
             {
                 var row = rowObj as Dictionary<string, object>;
                 if (row == null) continue;
-                if (!string.Equals(GetString(row, "ordId"), orderId, StringComparison.OrdinalIgnoreCase)) continue;
-                instId = GetString(row, "instId");
+                if (!string.Equals(ReadOkxOrderId(row), orderId, StringComparison.OrdinalIgnoreCase)) continue;
+                instId = NormalizeProduct(ReadOkxInstrumentId(row));
                 break;
             }
 
@@ -362,10 +367,19 @@ namespace CryptoDayTraderSuite.Exchanges
         {
             EnsureCredentials();
             var instId = NormalizeProduct(productId);
+            if (string.IsNullOrWhiteSpace(instId))
+            {
+                return false;
+            }
 
             var pendingReq = BuildSignedRequest(HttpMethod.Get, "/api/v5/trade/orders-pending?instId=" + Uri.EscapeDataString(instId), string.Empty);
             var pendingJson = await HttpUtil.SendAsync(pendingReq).ConfigureAwait(false);
             var pendingRoot = UtilCompat.JsonDeserialize<Dictionary<string, object>>(pendingJson);
+            if (!IsOkxSuccess(pendingRoot))
+            {
+                return false;
+            }
+
             var pending = ToObjectArray(pendingRoot != null && pendingRoot.ContainsKey("data") ? pendingRoot["data"] : null);
             if (pending.Length == 0) return true;
 
@@ -374,14 +388,21 @@ namespace CryptoDayTraderSuite.Exchanges
             foreach (var rowObj in pending)
             {
                 var row = rowObj as Dictionary<string, object>;
-                if (row == null) continue;
-                var ordId = GetString(row, "ordId");
-                if (string.IsNullOrWhiteSpace(ordId)) continue;
+                if (row == null) return false;
+                var ordId = ReadOkxOrderId(row);
+                if (string.IsNullOrWhiteSpace(ordId)) return false;
+
+                var rowInstId = NormalizeProduct(ReadOkxInstrumentId(row));
+                if (string.IsNullOrWhiteSpace(rowInstId))
+                {
+                    rowInstId = instId;
+                }
+
                 attempted++;
 
                 var body = UtilCompat.JsonSerialize(new Dictionary<string, object>
                 {
-                    { "instId", instId },
+                    { "instId", rowInstId },
                     { "ordId", ordId }
                 });
 
@@ -392,6 +413,22 @@ namespace CryptoDayTraderSuite.Exchanges
             }
 
             return attempted > 0 && canceled == attempted;
+        }
+
+        private string ReadOkxOrderId(Dictionary<string, object> row)
+        {
+            var value = GetString(row, "ordId");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "order_id");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "orderId");
+            return value;
+        }
+
+        private string ReadOkxInstrumentId(Dictionary<string, object> row)
+        {
+            var value = GetString(row, "instId");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "instrument_id");
+            if (string.IsNullOrWhiteSpace(value)) value = GetString(row, "instrumentId");
+            return value;
         }
 
         private async Task<Dictionary<string, object>> QueryTradeFeeAsync(string pathWithQuery)
@@ -649,8 +686,23 @@ namespace CryptoDayTraderSuite.Exchanges
 
         private string GetString(Dictionary<string, object> obj, string key)
         {
-            if (obj == null || string.IsNullOrWhiteSpace(key) || !obj.ContainsKey(key) || obj[key] == null) return string.Empty;
-            return Convert.ToString(obj[key], CultureInfo.InvariantCulture) ?? string.Empty;
+            if (obj == null || string.IsNullOrWhiteSpace(key)) return string.Empty;
+
+            object value;
+            if (obj.TryGetValue(key, out value) && value != null)
+            {
+                return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+
+            foreach (var pair in obj)
+            {
+                if (pair.Key == null) continue;
+                if (!string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase)) continue;
+                if (pair.Value == null) return string.Empty;
+                return Convert.ToString(pair.Value, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+
+            return string.Empty;
         }
 
         private void EnsureCredentials()

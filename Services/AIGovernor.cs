@@ -222,15 +222,7 @@ namespace CryptoDayTraderSuite.Services
 
             // 3. Prompt
             var json = UtilCompat.JsonSerialize(ctx);
-            var prompt =
-                "You are a deterministic crypto regime classifier. Analyze the BTC market snapshot below and classify directional bias. "
-                + "Use only the provided data. Return ONLY valid JSON (no markdown, no prose, no code fences). "
-                + "Schema: {\"bias\":\"Bullish\"|\"Bearish\"|\"Neutral\",\"reason\":\"one short sentence\",\"confidence\":0.0-1.0}. "
-                + "Return exactly one top-level JSON object with exactly these keys: bias, reason, confidence. "
-                + "Do NOT wrap in result/data/response/output/payload keys, and do NOT return an array. "
-                + "If evidence conflicts or is weak, set bias to Neutral with confidence <= 0.55. "
-                + "Wrap your final JSON exactly as: " + JsonStartMarker + "{...}" + JsonEndMarker + ". "
-                + "JSON Data: " + json;
+            var prompt = BuildGovernorBiasPrompt(json);
 
             // 4. Query all available providers and aggregate.
             var responses = await _sidecar.QueryAcrossAvailableServicesAsync(prompt);
@@ -280,8 +272,7 @@ namespace CryptoDayTraderSuite.Services
 
             if (parsed.Count == 0)
             {
-                var repairSchema = "{\"bias\":\"Bullish\"|\"Bearish\"|\"Neutral\",\"reason\":\"one short sentence\",\"confidence\":0.0-1.0}";
-                var retryRaw = await QueryStrictJsonRepairAsync(repairSchema, string.Join("\n", responses.Where(r => r != null).Select(r => NormalizeAiResponseText(r.Raw ?? string.Empty))));
+                var retryRaw = await QueryStrictJsonRepairAsync(AiJsonSchemas.GovernorBiasSchema, string.Join("\n", responses.Where(r => r != null).Select(r => NormalizeAiResponseText(r.Raw ?? string.Empty))));
                 if (!string.IsNullOrWhiteSpace(retryRaw))
                 {
                     var retryOutcome = ParseBiasFromResponse(NormalizeAiResponseText(retryRaw));
@@ -328,6 +319,25 @@ namespace CryptoDayTraderSuite.Services
 
             foreach (var candidate in EnumerateJsonCandidates(clean))
             {
+                if (StrictJsonPromptContract.MatchesExactTopLevelObjectContract(candidate, AiJsonSchemas.GovernorBiasKeys))
+                {
+                    AIResponse strictResp = null;
+                    try
+                    {
+                        strictResp = UtilCompat.JsonDeserialize<AIResponse>(candidate);
+                    }
+                    catch
+                    {
+                        strictResp = null;
+                    }
+
+                    if (strictResp != null && TryParseBiasValue(strictResp.Bias, out var strictBias))
+                    {
+                        outcome.Bias = strictBias;
+                        return outcome;
+                    }
+                }
+
                 if (TryParseBiasFromFlexibleContract(candidate, out var flexBias))
                 {
                     outcome.Bias = flexBias;
@@ -729,13 +739,7 @@ namespace CryptoDayTraderSuite.Services
             var previous = (previousResponse ?? string.Empty).Trim();
             if (previous.Length > 1200) previous = previous.Substring(0, 1200);
 
-            var prompt = "Your last response was not valid for parser consumption. Return ONLY strict JSON with no markdown/prose/code fences. "
-                + "Schema: " + schema + ". "
-                + "Return exactly one top-level JSON object using only the schema keys. "
-                + "Do NOT return arrays and do NOT wrap under result/data/response/output/payload. "
-                + "Wrap your final JSON exactly as: " + JsonStartMarker + "{...}" + JsonEndMarker + ". "
-                + "Do not wrap the JSON in quotes. Use plain object JSON only. "
-                + "Previous response to fix: " + previous;
+            var prompt = StrictJsonPromptContract.BuildRepairPrompt(schema, JsonStartMarker, JsonEndMarker, previous);
 
             try
             {
@@ -746,6 +750,23 @@ namespace CryptoDayTraderSuite.Services
                 Log("AI strict-json retry failed: " + ex.Message);
                 return string.Empty;
             }
+        }
+
+        private string BuildGovernorBiasPrompt(string jsonPayload)
+        {
+            var extraInstructions = new[]
+            {
+                "If evidence conflicts or is weak, set bias to Neutral with confidence <= 0.55."
+            };
+
+            return StrictJsonPromptContract.BuildPrompt(
+                "You are a deterministic crypto regime classifier. Analyze the BTC market snapshot below and classify directional bias.",
+                AiJsonSchemas.GovernorBiasSchema,
+                AiJsonSchemas.GovernorBiasKeysCsv,
+                JsonStartMarker,
+                JsonEndMarker,
+                extraInstructions,
+                jsonPayload);
         }
 
         private MarketBias? ParseBiasFromLabeledText(string text)

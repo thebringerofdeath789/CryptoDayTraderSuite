@@ -514,3 +514,159 @@
 
 - Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
 - Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_183610.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_POLICY_DECISION=allow-geo-partial`.
+
+## Post-Audit Remediation (Iteration 9) - 2026-02-17
+
+### R9 Changes Applied
+
+- Normalized place preflight failure handling across active exchange brokers:
+  - `Brokers/BinanceBroker.cs`
+  - `Brokers/BybitBroker.cs`
+  - `Brokers/CoinbaseExchangeBroker.cs`
+  - `Brokers/OkxBroker.cs`
+- `PlaceOrderAsync(...)` now returns `ValidateTradePlanAsync(...)` failures directly (`return validation`) instead of re-wrapping, preventing nested/duplicated failure prefixes.
+- Standardized place-path symbol-normalization failures to categorized messages via `BuildFailureMessage("validation", null, "symbol is invalid after normalization")`.
+
+### R9 Finding Status Updates
+
+- `BUG-OBSERVABILITY-VALIDATIONPREFIX-001`: **Closed** (validation failures no longer double-prefixed in place preflight paths).
+
+### R9 Verification
+
+- Diagnostics: no errors in modified broker files.
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_183610.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
+
+## Post-Audit Remediation (Iteration 10) - 2026-02-17
+
+### R10 Changes Applied
+
+- Normalized structured failure taxonomy across `ValidateTradePlanAsync(...)` in active exchange brokers:
+  - `Brokers/BinanceBroker.cs`
+  - `Brokers/BybitBroker.cs`
+  - `Brokers/CoinbaseExchangeBroker.cs`
+  - `Brokers/OkxBroker.cs`
+- Input and geometry guards now return categorized `validation` failures via `BuildFailureMessage(...)`.
+- Symbol constraint resolution and precision/notional rule violations now return categorized `constraints` failures via `BuildFailureMessage(...)`.
+
+### R10 Finding Status Updates
+
+- `BUG-OBSERVABILITY-CONSTRAINTCATEGORY-001`: **Closed** (constraint-rule failures now emit consistent structured categories across active exchange brokers).
+
+### R10 Verification
+
+- Diagnostics: no errors in modified broker files.
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_191903.txt` => `VERDICT=PARTIAL`, `StrictFailureClass=NONE`, `StrictFailures=count=0`, `StrictPolicyDecision=allow-geo-partial`.
+
+## Post-Audit Remediation (Iteration 11) - 2026-02-17
+
+### R11 Changes Applied
+
+- Completed validation success-contract normalization across active brokers:
+  - `Brokers/BinanceBroker.cs`
+  - `Brokers/BybitBroker.cs`
+  - `Brokers/CoinbaseExchangeBroker.cs`
+  - `Brokers/OkxBroker.cs`
+- `ValidateTradePlanAsync(...)` success now emits structured `validation` category (`BuildSuccessMessage("validation", "ok")`) instead of raw `"ok"`.
+- Extended structured message taxonomy to `Brokers/PaperBroker.cs`:
+  - added `BuildSuccessMessage(...)` / `BuildFailureMessage(...)` helpers,
+  - normalized validation failures to `validation:*`,
+  - normalized validation success to `validation: ok`,
+  - normalized place success to `accepted:*` and cancel-all success to `canceled:*`,
+  - aligned place preflight handling to return failed validation tuple directly.
+
+### R11 Finding Status Updates
+
+- `BUG-OBSERVABILITY-SUCCESSCATEGORY-001`: **Closed** (validation success/result taxonomy is now structured and consistent across active brokers, including Paper).
+
+### R11 Verification
+
+- Diagnostics: no errors in modified broker files.
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_193757.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
+
+## Post-Audit Remediation (Iteration 12) - 2026-02-17
+
+### R12 Changes Applied
+
+- Consolidated duplicated broker message-format logic into shared helper `Brokers/BrokerMessageFormatter.cs`.
+- Added shared helper to project compile items in `CryptoDayTraderSuite.csproj`.
+- Refactored broker-local formatters to delegate to shared helper in:
+  - `Brokers/BinanceBroker.cs`
+  - `Brokers/BybitBroker.cs`
+  - `Brokers/CoinbaseExchangeBroker.cs`
+  - `Brokers/OkxBroker.cs`
+  - `Brokers/PaperBroker.cs`
+- Preserved runtime message contract categories (`validation`, `constraints`, `place`, `cancel`, `accepted`, `canceled`) while eliminating formatter logic duplication.
+
+### R12 Finding Status Updates
+
+- `TECHDEBT-DUPLICATED-MESSAGEFORMAT-001`: **Closed** (single shared formatting implementation now used across active brokers).
+
+### R12 Verification
+
+- Diagnostics: no errors in modified broker files and project file.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_195304.txt` => `VERDICT=PARTIAL`, `StrictFailureClass=NONE`, `StrictFailures=count=0`, `StrictPolicyDecision=allow-geo-partial`.
+
+## Post-Audit Remediation (Iteration 13) - 2026-02-17
+
+### R13 Changes Applied
+
+- Hardened reject-evidence capture script failure signaling in `obj/run_reject_evidence_capture.ps1`.
+- Added top-level `trap` to convert unhandled script exceptions into deterministic telemetry output:
+  - emits `UNHANDLED_ERROR=<message>`
+  - emits `RESULT:PARTIAL unhandled script error during reject evidence capture.`
+  - exits with explicit code `6` (instead of ambiguous unhandled exit `1`).
+
+### R13 Finding Status Updates
+
+- `BUG-OPS-CAPTURE-EXITSIGNAL-001`: **Closed** (reject-capture script now fails with explicit result marker and deterministic non-generic exit code on unhandled errors).
+
+### R13 Verification
+
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_200928.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
+
+## Post-Audit Remediation (Iteration 14) - 2026-02-17
+
+### R14 Changes Applied
+
+- Finalized deterministic result-contract handling in `obj/run_reject_evidence_capture.ps1` by routing top-level unhandled-error `trap` through `Complete-Result`.
+- This aligns unhandled failures with the same policy-aware exit contract used for normal partial outcomes (`AllowPartialExitCodeZero` support + explicit result markers).
+
+### R14 Finding Status Updates
+
+- `BUG-OPS-CAPTURE-EXITSIGNAL-002`: **Closed** (unhandled failures now honor shared completion contract and optional partial-exit override).
+
+### R14 Verification
+
+- Runtime probe (fast mode):
+  - command included `-AllowPartialExitCodeZero` with one-attempt capture settings.
+  - output included deterministic markers: `RESULT:PARTIAL ...`, `RESULT_EXIT_CODE=4`, `RESULT_EXIT_ORIGINAL=4`, `RESULT_EXIT_OVERRIDDEN=0 mode=allow-partial-exit-zero`.
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_201942.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
+
+## Post-Audit Remediation (Iteration 15) - 2026-02-17
+
+### R15 Changes Applied
+
+- Added deterministic completion markers for additional orchestration scripts:
+  - `Util/check_multiexchange_contract.ps1`
+  - `Util/validate_automode_matrix.ps1`
+  - `Util/run_provider_public_api_probe.ps1`
+- Introduced script-local `Complete-Result` helpers to emit explicit exit telemetry (`RESULT_EXIT_CODE` + script-specific exit keys) before terminating.
+- Added trap-based deterministic failure signaling in scripts that lacked unhandled-error result markers.
+- Fixed `validate_automode_matrix.ps1` failure-path output so marker emission is non-terminating under `$ErrorActionPreference='Stop'` (replaced terminating `Write-Error` in terminal path with deterministic marker output).
+
+### R15 Finding Status Updates
+
+- `BUG-OPS-SCRIPT-EXITSIGNAL-001`: **Closed** (contract-checker/matrix/probe scripts now emit deterministic completion markers instead of plain exits).
+
+### R15 Verification
+
+- `Util/check_multiexchange_contract.ps1 -Strict` now emits deterministic completion markers (`CONTRACT_RESULT=PASS`, `RESULT_EXIT_CODE=0`, `CONTRACT_FINAL_EXIT=0`).
+- `Util/validate_automode_matrix.ps1` failing matrix now emits deterministic failure markers (`MATRIX_RESULT=FAIL`, `MATRIX_ERROR=...`, `RESULT_EXIT_CODE=1`, `MATRIX_EXIT_CODE=1`).
+- `Util/run_provider_public_api_probe.ps1` emits deterministic probe exit markers (`PROBE_VERDICT=FAIL`, `RESULT_EXIT_CODE=1`, `PROBE_EXIT_CODE=1`) under geo-constrained conditions.
+- Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_202452.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
