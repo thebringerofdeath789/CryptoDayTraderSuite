@@ -500,6 +500,7 @@ namespace CryptoDayTraderSuite
                 {
                     case "Dashboard":
                         var db = new DashboardControl();
+                        db.NavigationRequest += destination => NavigateTo(destination);
                         if (_accountService != null) 
                             db.Initialize(_accountService, _historyService ?? new HistoryService(), _governor);
                         CryptoDayTraderSuite.Themes.Theme.Apply(db);
@@ -551,13 +552,16 @@ namespace CryptoDayTraderSuite
                         return _autoModeControl;
 
                     case "Accounts":
-                        return CreateSetupCenterView("Accounts", false);
+                        return CreateAccountsView();
+
+                    case "Insights":
+                        return CreateInsightsView();
 
                     case "Keys":
-                        return CreateSetupCenterView("API Keys", false);
+                        return CreateKeysView();
                          
                     case "Settings":
-                        return CreateSetupCenterView("Accounts", true);
+                        return CreateSettingsView();
 
                     case "Profiles":
                         var pm = new ProfileManagerControl();
@@ -645,14 +649,51 @@ namespace CryptoDayTraderSuite
             }
         }
 
-        private Control CreateSetupCenterView(string initialTab, bool includeStrategyButton)
+        private Control CreateAccountsView()
+        {
+            var accounts = new AccountsControl();
+            if (_accountService != null)
+            {
+                accounts.Initialize(_accountService, _keyService, _historyService);
+            }
+            accounts.Dock = DockStyle.Fill;
+            CryptoDayTraderSuite.Themes.Theme.Apply(accounts);
+            return accounts;
+        }
+
+        private Control CreateInsightsView()
+        {
+            var insights = new AccountsControl();
+            if (_accountService != null)
+            {
+                insights.Initialize(_accountService, _keyService, _historyService);
+            }
+            insights.SetInsightsOnlyMode(true);
+            insights.Dock = DockStyle.Fill;
+            CryptoDayTraderSuite.Themes.Theme.Apply(insights);
+            return insights;
+        }
+
+        private Control CreateKeysView()
+        {
+            var keys = new KeysControl();
+            if (_keyService != null)
+            {
+                keys.Initialize(_keyService, _accountService, _historyService);
+            }
+            keys.Dock = DockStyle.Fill;
+            CryptoDayTraderSuite.Themes.Theme.Apply(keys);
+            return keys;
+        }
+
+        private Control CreateSettingsView()
         {
             var settingsPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, AutoScroll = true, WrapContents = false };
             settingsPanel.BackColor = CryptoDayTraderSuite.Themes.Theme.ContentBg;
 
             var lblSetup = new Label
             {
-                Text = "Setup Center",
+                Text = "Settings",
                 Font = new System.Drawing.Font("Segoe UI", 14, System.Drawing.FontStyle.Bold),
                 AutoSize = true,
                 ForeColor = CryptoDayTraderSuite.Themes.Theme.Text,
@@ -660,156 +701,130 @@ namespace CryptoDayTraderSuite
             };
             settingsPanel.Controls.Add(lblSetup);
 
-            var setupTabs = new TabControl
+            var profileHost = new Panel
             {
                 Width = 920,
-                Height = 520,
+                Height = 360,
                 Margin = new Padding(10)
             };
 
-            var tabAccounts = new TabPage("Accounts");
-            var tabKeys = new TabPage("API Keys");
-            var tabProfiles = new TabPage("Profiles");
-
-            var setupAccounts = new AccountsControl();
-            if (_accountService != null) setupAccounts.Initialize(_accountService, _keyService, _historyService);
-            setupAccounts.Dock = DockStyle.Fill;
-            tabAccounts.Controls.Add(setupAccounts);
-
-            var setupKeys = new KeysControl();
-            if (_keyService != null) setupKeys.Initialize(_keyService, _accountService, _historyService);
-            setupKeys.Dock = DockStyle.Fill;
-            tabKeys.Controls.Add(setupKeys);
-
             var setupProfiles = new ProfilesControl();
-            if (_profileService != null) setupProfiles.Initialize(_profileService);
-            setupProfiles.Dock = DockStyle.Fill;
-            tabProfiles.Controls.Add(setupProfiles);
-
-            setupTabs.TabPages.Add(tabAccounts);
-            setupTabs.TabPages.Add(tabKeys);
-            setupTabs.TabPages.Add(tabProfiles);
-
-            if (string.Equals(initialTab ?? string.Empty, "API Keys", StringComparison.OrdinalIgnoreCase))
-                setupTabs.SelectedTab = tabKeys;
-            else if (string.Equals(initialTab ?? string.Empty, "Profiles", StringComparison.OrdinalIgnoreCase))
-                setupTabs.SelectedTab = tabProfiles;
-            else
-                setupTabs.SelectedTab = tabAccounts;
-
-            settingsPanel.Controls.Add(setupTabs);
-
-            if (includeStrategyButton)
+            if (_profileService != null)
             {
-                var sidecarPanel = new FlowLayoutPanel
-                {
-                    Width = 920,
-                    Height = 72,
-                    Margin = new Padding(20, 0, 20, 0),
-                    FlowDirection = FlowDirection.LeftToRight,
-                    WrapContents = false
-                };
-
-                var chkSidecarLaunchHidden = new CheckBox
-                {
-                    Text = "Launch Sidecar Hidden",
-                    AutoSize = true,
-                    Checked = CryptoDayTraderSuite.Properties.Settings.Default.SidecarLaunchHidden,
-                    Margin = new Padding(4, 12, 14, 0)
-                };
-
-                var btnSidecarVisibility = new Button
-                {
-                    Width = 130,
-                    Height = 28,
-                    Margin = new Padding(0, 8, 8, 0)
-                };
-
-                var lblSidecarWindowStatus = new Label
-                {
-                    AutoSize = true,
-                    Margin = new Padding(0, 14, 0, 0),
-                    Text = "Sidecar Window: Unknown"
-                };
-
-                var sidecarUiSync = false;
-
-                Action refreshSidecarButtons = () =>
-                {
-                    sidecarUiSync = true;
-                    if (_sidecar == null)
-                    {
-                        chkSidecarLaunchHidden.Enabled = false;
-                        btnSidecarVisibility.Enabled = false;
-                        btnSidecarVisibility.Text = "Sidecar N/A";
-                        lblSidecarWindowStatus.Text = "Sidecar Window: Not managed";
-                        sidecarUiSync = false;
-                        return;
-                    }
-
-                    chkSidecarLaunchHidden.Enabled = true;
-                    chkSidecarLaunchHidden.Checked = _sidecar.LaunchChromeHidden;
-                    btnSidecarVisibility.Enabled = true;
-                    var isVisible = _sidecar.IsManagedChromeVisible();
-                    btnSidecarVisibility.Text = isVisible ? "Hide Sidecar" : "Show Sidecar";
-                    lblSidecarWindowStatus.Text = "Sidecar Window: " + (isVisible ? "Visible" : "Hidden");
-                    sidecarUiSync = false;
-                };
-
-                chkSidecarLaunchHidden.CheckedChanged += (s, ev) =>
-                {
-                    if (sidecarUiSync)
-                    {
-                        return;
-                    }
-
-                    var hidden = chkSidecarLaunchHidden.Checked;
-                    if (_sidecar != null)
-                    {
-                        _sidecar.SetLaunchChromeHidden(hidden);
-                        if (hidden)
-                        {
-                            _sidecar.SetManagedChromeVisible(false);
-                        }
-                    }
-
-                    CryptoDayTraderSuite.Properties.Settings.Default.SidecarLaunchHidden = hidden;
-                    CryptoDayTraderSuite.Properties.Settings.Default.Save();
-                    refreshSidecarButtons();
-                };
-
-                btnSidecarVisibility.Click += (s, ev) =>
-                {
-                    if (_sidecar == null)
-                    {
-                        refreshSidecarButtons();
-                        return;
-                    }
-
-                    var visible = _sidecar.IsManagedChromeVisible();
-                    _sidecar.SetManagedChromeVisible(!visible);
-                    refreshSidecarButtons();
-                };
-
-                sidecarPanel.Controls.Add(chkSidecarLaunchHidden);
-                sidecarPanel.Controls.Add(btnSidecarVisibility);
-                sidecarPanel.Controls.Add(lblSidecarWindowStatus);
-                settingsPanel.Controls.Add(sidecarPanel);
-                refreshSidecarButtons();
-
-                var btnConfig = new Button { Text = "Configure Strategies", Width = 220, Height = 40, Margin = new Padding(20) };
-                btnConfig.Click += (s, ev) => {
-                    if (_engine != null)
-                    {
-                        using(var dlg = new StrategyConfigDialog(_engine))
-                        {
-                            dlg.ShowDialog();
-                        }
-                    }
-                    else MessageBox.Show("Strategy Engine not initialized.");
-                };
-                settingsPanel.Controls.Add(btnConfig);
+                setupProfiles.Initialize(_profileService);
             }
+            setupProfiles.Dock = DockStyle.Fill;
+            profileHost.Controls.Add(setupProfiles);
+            settingsPanel.Controls.Add(profileHost);
+
+            var sidecarPanel = new FlowLayoutPanel
+            {
+                Width = 920,
+                Height = 72,
+                Margin = new Padding(20, 0, 20, 0),
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+
+            var chkSidecarLaunchHidden = new CheckBox
+            {
+                Text = "Launch Sidecar Hidden",
+                AutoSize = true,
+                Checked = CryptoDayTraderSuite.Properties.Settings.Default.SidecarLaunchHidden,
+                Margin = new Padding(4, 12, 14, 0)
+            };
+
+            var btnSidecarVisibility = new Button
+            {
+                Width = 130,
+                Height = 28,
+                Margin = new Padding(0, 8, 8, 0)
+            };
+
+            var lblSidecarWindowStatus = new Label
+            {
+                AutoSize = true,
+                Margin = new Padding(0, 14, 0, 0),
+                Text = "Sidecar Window: Unknown"
+            };
+
+            var sidecarUiSync = false;
+
+            Action refreshSidecarButtons = () =>
+            {
+                sidecarUiSync = true;
+                if (_sidecar == null)
+                {
+                    chkSidecarLaunchHidden.Enabled = false;
+                    btnSidecarVisibility.Enabled = false;
+                    btnSidecarVisibility.Text = "Sidecar N/A";
+                    lblSidecarWindowStatus.Text = "Sidecar Window: Not managed";
+                    sidecarUiSync = false;
+                    return;
+                }
+
+                chkSidecarLaunchHidden.Enabled = true;
+                chkSidecarLaunchHidden.Checked = _sidecar.LaunchChromeHidden;
+                btnSidecarVisibility.Enabled = true;
+                var isVisible = _sidecar.IsManagedChromeVisible();
+                btnSidecarVisibility.Text = isVisible ? "Hide Sidecar" : "Show Sidecar";
+                lblSidecarWindowStatus.Text = "Sidecar Window: " + (isVisible ? "Visible" : "Hidden");
+                sidecarUiSync = false;
+            };
+
+            chkSidecarLaunchHidden.CheckedChanged += (s, ev) =>
+            {
+                if (sidecarUiSync)
+                {
+                    return;
+                }
+
+                var hidden = chkSidecarLaunchHidden.Checked;
+                if (_sidecar != null)
+                {
+                    _sidecar.SetLaunchChromeHidden(hidden);
+                    if (hidden)
+                    {
+                        _sidecar.SetManagedChromeVisible(false);
+                    }
+                }
+
+                CryptoDayTraderSuite.Properties.Settings.Default.SidecarLaunchHidden = hidden;
+                CryptoDayTraderSuite.Properties.Settings.Default.Save();
+                refreshSidecarButtons();
+            };
+
+            btnSidecarVisibility.Click += (s, ev) =>
+            {
+                if (_sidecar == null)
+                {
+                    refreshSidecarButtons();
+                    return;
+                }
+
+                var visible = _sidecar.IsManagedChromeVisible();
+                _sidecar.SetManagedChromeVisible(!visible);
+                refreshSidecarButtons();
+            };
+
+            sidecarPanel.Controls.Add(chkSidecarLaunchHidden);
+            sidecarPanel.Controls.Add(btnSidecarVisibility);
+            sidecarPanel.Controls.Add(lblSidecarWindowStatus);
+            settingsPanel.Controls.Add(sidecarPanel);
+            refreshSidecarButtons();
+
+            var btnConfig = new Button { Text = "Configure Strategies", Width = 220, Height = 40, Margin = new Padding(20) };
+            btnConfig.Click += (s, ev) => {
+                if (_engine != null)
+                {
+                    using(var dlg = new StrategyConfigDialog(_engine))
+                    {
+                        dlg.ShowDialog();
+                    }
+                }
+                else MessageBox.Show("Strategy Engine not initialized.");
+            };
+            settingsPanel.Controls.Add(btnConfig);
 
             ApplyThemeToControl(settingsPanel);
             return settingsPanel;

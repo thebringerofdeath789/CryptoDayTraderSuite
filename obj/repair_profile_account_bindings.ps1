@@ -7,6 +7,36 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$CiVersion = '1'
+$CiFields = 'result|decision|exit|apply|enabled_profiles|enabled_accounts|target_account|updates'
+
+function Complete-Result {
+    param(
+        [string]$Result,
+        [string]$Decision,
+        [int]$ExitCode,
+        [string]$Message,
+        [int]$Updates
+    )
+
+    $resultText = if ([string]::IsNullOrWhiteSpace($Result)) { 'FAIL' } else { $Result.Trim().ToUpperInvariant() }
+    $decisionText = if ([string]::IsNullOrWhiteSpace($Decision)) { 'unknown' } else { $Decision.Trim().ToLowerInvariant() }
+    $targetText = if ([string]::IsNullOrWhiteSpace($targetAccountId)) { 'none' } else { $targetAccountId }
+
+    Write-Output ('CAPTURE_RESULT=' + $resultText)
+    Write-Output ('CAPTURE_DECISION=' + $decisionText)
+    Write-Output ('CI_VERSION=' + $CiVersion)
+    Write-Output ('CI_FIELDS=' + $CiFields)
+    Write-Output ('CI_SUMMARY=version=' + $CiVersion + ';result=' + $resultText + ';decision=' + $decisionText + ';exit=' + $ExitCode + ';apply=' + ([int]$Apply.IsPresent) + ';enabled_profiles=' + $enabledProfiles.Count + ';enabled_accounts=' + $enabledAccounts.Count + ';target_account=' + $targetText + ';updates=' + $Updates)
+
+    if (-not [string]::IsNullOrWhiteSpace($Message)) {
+        Write-Output $Message
+    }
+
+    Write-Output ('RESULT_EXIT_CODE=' + $ExitCode)
+    exit $ExitCode
+}
+
 function Read-JsonAny {
     param([string]$Path)
 
@@ -61,13 +91,11 @@ Write-Output ('REPAIR_ENABLED_PROFILES=' + $enabledProfiles.Count)
 Write-Output ('REPAIR_ENABLED_ACCOUNTS=' + $enabledAccounts.Count)
 
 if ($enabledProfiles.Count -lt 1) {
-    Write-Output 'REPAIR_RESULT=NOOP no enabled profiles.'
-    exit 0
+    Complete-Result -Result 'NOOP' -Decision 'noop-no-enabled-profiles' -ExitCode 0 -Message 'REPAIR_RESULT=NOOP no enabled profiles.' -Updates 0
 }
 
 if ($enabledAccounts.Count -lt 1) {
-    Write-Output 'REPAIR_RESULT=FAIL no enabled accounts available.'
-    exit 2
+    Complete-Result -Result 'FAIL' -Decision 'fail-no-enabled-accounts' -ExitCode 2 -Message 'REPAIR_RESULT=FAIL no enabled accounts available.' -Updates 0
 }
 
 $targetAccountId = $AccountId
@@ -78,14 +106,13 @@ if ([string]::IsNullOrWhiteSpace($targetAccountId)) {
     else {
         Write-Output 'REPAIR_RESULT=FAIL multiple enabled accounts detected; pass -AccountId.'
         Write-Output ('REPAIR_ENABLED_ACCOUNT_IDS=' + (($enabledAccounts | ForEach-Object { $_.Id }) -join ','))
-        exit 3
+        Complete-Result -Result 'FAIL' -Decision 'fail-multiple-enabled-accounts' -ExitCode 3 -Message '' -Updates 0
     }
 }
 
 $target = $enabledAccounts | Where-Object { [string]::Equals($_.Id.ToString(), $targetAccountId, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
 if ($null -eq $target) {
-    Write-Output ('REPAIR_RESULT=FAIL target account not enabled or not found: ' + $targetAccountId)
-    exit 4
+    Complete-Result -Result 'FAIL' -Decision 'fail-target-account-missing' -ExitCode 4 -Message ('REPAIR_RESULT=FAIL target account not enabled or not found: ' + $targetAccountId) -Updates 0
 }
 
 $enabledAccountIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
@@ -113,8 +140,7 @@ foreach ($p in $enabledProfiles) {
 
 if (-not $Apply.IsPresent) {
     Write-Output ('REPAIR_PENDING_UPDATES=' + $updates)
-    Write-Output 'REPAIR_RESULT=DRYRUN'
-    exit 0
+    Complete-Result -Result 'DRYRUN' -Decision 'dryrun' -ExitCode 0 -Message 'REPAIR_RESULT=DRYRUN' -Updates $updates
 }
 
 if ($updates -gt 0) {
@@ -126,5 +152,4 @@ if ($updates -gt 0) {
 }
 
 Write-Output ('REPAIR_APPLIED_UPDATES=' + $updates)
-Write-Output 'REPAIR_RESULT=PASS'
-exit 0
+Complete-Result -Result 'PASS' -Decision 'pass' -ExitCode 0 -Message 'REPAIR_RESULT=PASS' -Updates $updates

@@ -40,6 +40,7 @@ namespace CryptoDayTraderSuite.UI
             this.btnPlanner = new System.Windows.Forms.Button();
             this.btnAuto = new System.Windows.Forms.Button();
             this.btnAccounts = new System.Windows.Forms.Button();
+            this.btnInsights = new System.Windows.Forms.Button();
             this.btnKeys = new System.Windows.Forms.Button();
             this.btnSettings = new System.Windows.Forms.Button();
             this.widgetGovernor = new CryptoDayTraderSuite.UI.GovernorWidget();
@@ -54,6 +55,7 @@ namespace CryptoDayTraderSuite.UI
             this._layoutPanel.Controls.Add(this.btnPlanner);
             this._layoutPanel.Controls.Add(this.btnAuto);
             this._layoutPanel.Controls.Add(this.btnAccounts);
+            this._layoutPanel.Controls.Add(this.btnInsights);
             this._layoutPanel.Controls.Add(this.btnKeys);
             this._layoutPanel.Controls.Add(this.btnSettings);
             this._layoutPanel.Dock = System.Windows.Forms.DockStyle.Top;
@@ -159,6 +161,21 @@ namespace CryptoDayTraderSuite.UI
             this.btnAccounts.UseVisualStyleBackColor = true;
             this.btnAccounts.Click += new System.EventHandler(this.OnNavClick);
             // 
+            // btnInsights
+            // 
+            this.btnInsights.FlatAppearance.BorderSize = 0;
+            this.btnInsights.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnInsights.Font = new System.Drawing.Font("Segoe UI Semibold", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnInsights.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(162)))), ((int)(((byte)(168)))));
+            this.btnInsights.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.btnInsights.Name = "btnInsights";
+            this.btnInsights.Size = new System.Drawing.Size(194, 45);
+            this.btnInsights.TabIndex = 6;
+            this.btnInsights.Text = "  Account Insights";
+            this.btnInsights.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.btnInsights.UseVisualStyleBackColor = true;
+            this.btnInsights.Click += new System.EventHandler(this.OnNavClick);
+            // 
             // btnKeys
             // 
             this.btnKeys.FlatAppearance.BorderSize = 0;
@@ -168,7 +185,7 @@ namespace CryptoDayTraderSuite.UI
             this.btnKeys.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.btnKeys.Name = "btnKeys";
             this.btnKeys.Size = new System.Drawing.Size(194, 45);
-            this.btnKeys.TabIndex = 6;
+            this.btnKeys.TabIndex = 7;
             this.btnKeys.Text = "  API Keys";
             this.btnKeys.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.btnKeys.UseVisualStyleBackColor = true;
@@ -183,7 +200,7 @@ namespace CryptoDayTraderSuite.UI
             this.btnSettings.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.btnSettings.Name = "btnSettings";
             this.btnSettings.Size = new System.Drawing.Size(194, 45);
-            this.btnSettings.TabIndex = 7;
+            this.btnSettings.TabIndex = 8;
             this.btnSettings.Text = "  Settings";
             this.btnSettings.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.btnSettings.UseVisualStyleBackColor = true;
@@ -220,6 +237,7 @@ namespace CryptoDayTraderSuite.UI
         private System.Windows.Forms.Button btnPlanner;
         private System.Windows.Forms.Button btnAuto;
         private System.Windows.Forms.Button btnAccounts;
+        private System.Windows.Forms.Button btnInsights;
         private System.Windows.Forms.Button btnKeys;
         private System.Windows.Forms.Button btnSettings;
         private CryptoDayTraderSuite.UI.GovernorWidget widgetGovernor;

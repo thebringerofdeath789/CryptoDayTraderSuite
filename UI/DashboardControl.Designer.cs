@@ -23,6 +23,7 @@ namespace CryptoDayTraderSuite.UI
             this.topPanel = new System.Windows.Forms.Panel();
             this.lblWelcome = new System.Windows.Forms.Label();
             this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnAccountInsights = new System.Windows.Forms.Button();
             this.lblDataFreshness = new System.Windows.Forms.Label();
             this.widgetContainer = new System.Windows.Forms.Panel();
             this.summaryPanel = new System.Windows.Forms.TableLayoutPanel();
@@ -83,6 +84,7 @@ namespace CryptoDayTraderSuite.UI
             // 
             // topPanel
             // 
+            this.topPanel.Controls.Add(this.btnAccountInsights);
             this.topPanel.Controls.Add(this.btnRefresh);
             this.topPanel.Controls.Add(this.lblDataFreshness);
             this.topPanel.Controls.Add(this.lblWelcome);
@@ -112,6 +114,17 @@ namespace CryptoDayTraderSuite.UI
             this.btnRefresh.Text = "Refresh Data";
             this.btnRefresh.UseVisualStyleBackColor = true;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
+            // 
+            // btnAccountInsights
+            // 
+            this.btnAccountInsights.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnAccountInsights.Location = new System.Drawing.Point(128, 60);
+            this.btnAccountInsights.Name = "btnAccountInsights";
+            this.btnAccountInsights.Size = new System.Drawing.Size(150, 30);
+            this.btnAccountInsights.TabIndex = 3;
+            this.btnAccountInsights.Text = "Account Insights";
+            this.btnAccountInsights.UseVisualStyleBackColor = true;
+            this.btnAccountInsights.Click += new System.EventHandler(this.btnAccountInsights_Click);
             // 
             // lblDataFreshness
             // 
@@ -394,6 +407,7 @@ namespace CryptoDayTraderSuite.UI
         private System.Windows.Forms.Panel topPanel;
         private System.Windows.Forms.Label lblWelcome;
         private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnAccountInsights;
         private System.Windows.Forms.Label lblDataFreshness;
         private System.Windows.Forms.Panel widgetContainer;
         private System.Windows.Forms.TableLayoutPanel summaryPanel;

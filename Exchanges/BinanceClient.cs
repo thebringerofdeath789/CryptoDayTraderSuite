@@ -268,6 +268,49 @@ namespace CryptoDayTraderSuite.Exchanges
             return new FeeSchedule { MakerRate = 0.0010m, TakerRate = 0.0010m, Notes = "binance fallback fees" };
         }
 
+        public async Task<Dictionary<string, decimal>> GetBalancesAsync()
+        {
+            EnsureCredentials();
+
+            var query = BuildSignedQuery(new Dictionary<string, string>
+            {
+                { "recvWindow", "5000" }
+            });
+
+            var req = new HttpRequestMessage(HttpMethod.Get, _restBaseUrl + "/api/v3/account?" + query);
+            req.Headers.TryAddWithoutValidation("X-MBX-APIKEY", _apiKey);
+
+            var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
+            var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
+
+            var balances = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            var rows = ToObjectArray(obj.ContainsKey("balances") ? obj["balances"] : null);
+            foreach (var rowObj in rows)
+            {
+                var row = rowObj as Dictionary<string, object>;
+                if (row == null) continue;
+
+                var asset = GetString(row, "asset");
+                if (string.IsNullOrWhiteSpace(asset)) continue;
+
+                var free = ToDecimal(GetString(row, "free"));
+                var locked = ToDecimal(GetString(row, "locked"));
+                var total = free + locked;
+
+                decimal existing;
+                if (balances.TryGetValue(asset, out existing))
+                {
+                    balances[asset] = existing + total;
+                }
+                else
+                {
+                    balances[asset] = total;
+                }
+            }
+
+            return balances;
+        }
+
         public async Task<OrderResult> PlaceOrderAsync(OrderRequest order)
         {
             if (order == null) throw new ArgumentNullException(nameof(order));
@@ -319,6 +362,54 @@ namespace CryptoDayTraderSuite.Exchanges
                 AvgFillPrice = avg,
                 Message = string.IsNullOrWhiteSpace(status) ? "accepted" : status
             };
+        }
+
+        public async Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
+        {
+            EnsureCredentials();
+
+            var queryMap = new Dictionary<string, string> { { "recvWindow", "5000" } };
+            if (!string.IsNullOrWhiteSpace(productId))
+            {
+                queryMap["symbol"] = NormalizeProduct(productId);
+            }
+
+            var query = BuildSignedQuery(queryMap);
+            var req = new HttpRequestMessage(HttpMethod.Get, _restBaseUrl + "/api/v3/openOrders?" + query);
+            req.Headers.TryAddWithoutValidation("X-MBX-APIKEY", _apiKey);
+
+            var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
+            var result = UtilCompat.JsonDeserialize<List<Dictionary<string, object>>>(json) ?? new List<Dictionary<string, object>>();
+
+            var list = new List<OpenOrder>();
+            foreach (var item in result)
+            {
+                if (item == null) continue;
+                
+                var orderId = GetString(item, "orderId");
+                var symbol = GetString(item, "symbol");
+                var side = GetString(item, "side");
+                var type = GetString(item, "type");
+                var price = ToDecimal(GetString(item, "price"));
+                var origQty = ToDecimal(GetString(item, "origQty"));
+                var executedQty = ToDecimal(GetString(item, "executedQty"));
+                var status = GetString(item, "status");
+                var time = (long)ToDecimal(GetString(item, "time"));
+
+                list.Add(new OpenOrder
+                {
+                    OrderId = orderId,
+                    ProductId = symbol, /* Keeping raw symbol from exchange */
+                    Side = "BUY".Equals(side, StringComparison.OrdinalIgnoreCase) ? OrderSide.Buy : OrderSide.Sell,
+                    Type = "MARKET".Equals(type, StringComparison.OrdinalIgnoreCase) ? OrderType.Market : OrderType.Limit,
+                    Price = price,
+                    Quantity = origQty,
+                    FilledQty = executedQty,
+                    Status = status,
+                    CreatedUtc = DateTimeOffset.FromUnixTimeMilliseconds(time).UtcDateTime
+                });
+            }
+            return list;
         }
 
         public async Task<bool> CancelOrderAsync(string orderId)

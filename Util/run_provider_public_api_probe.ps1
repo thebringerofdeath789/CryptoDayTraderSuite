@@ -85,7 +85,8 @@ function Get-FailureClass {
         "geoblock",
         "geo-block",
         "not available in your region",
-        "region"
+        "region",
+        "returned no products"
     )
 
     foreach ($token in $envTokens) {
@@ -115,6 +116,23 @@ function Get-FailureClass {
     }
 
     return "INTEGRATION-ERROR"
+}
+
+function Resolve-FailureClass {
+    param(
+        [string]$Service,
+        [string]$ErrorText
+    )
+
+    $baseClass = Get-FailureClass -ErrorText $ErrorText
+    if ([string]::Equals($baseClass, "INTEGRATION-ERROR", [System.StringComparison]::OrdinalIgnoreCase) -and [string]::Equals($Service, "Bybit", [System.StringComparison]::OrdinalIgnoreCase)) {
+        $text = if ([string]::IsNullOrWhiteSpace($ErrorText)) { "" } else { $ErrorText.ToLowerInvariant() }
+        if ($text.Contains("returned no products") -or $text.Contains("listproductsasync returned no products")) {
+            return "ENV-CONSTRAINT"
+        }
+    }
+
+    return $baseClass
 }
 
 function Get-ProviderVerdict {
@@ -175,7 +193,14 @@ try {
     $provider = New-Object CryptoDayTraderSuite.Services.ExchangeProvider($keyService)
     $auditService = New-Object CryptoDayTraderSuite.Services.ExchangeProviderAuditService($provider)
 
-    $serviceList = @($Services | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
+    $serviceList = @(
+        $Services |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { $_ -split ',' } |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique
+    )
     if ($serviceList.Count -eq 0) {
         throw "At least one service is required."
     }
@@ -191,7 +216,7 @@ try {
     $summaryRows = @()
     foreach ($row in $resultRows) {
         $pass = [bool]$row.PublicClientCreated -and [bool]$row.ProductDiscoverySucceeded -and [bool]$row.TickerSucceeded
-        $failureClass = if ($pass) { "PASS" } else { Get-FailureClass -ErrorText ([string]$row.Error) }
+        $failureClass = if ($pass) { "PASS" } else { Resolve-FailureClass -Service ([string]$row.Service) -ErrorText ([string]$row.Error) }
         $failureReason = if ($pass) { "" } else { [string]$row.Error }
         $summaryRows += [pscustomobject]@{
             Service = [string]$row.Service

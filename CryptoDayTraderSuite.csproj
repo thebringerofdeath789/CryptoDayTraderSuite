@@ -130,6 +130,7 @@
     <Compile Include="Services\ExchangeProvider.cs" />
     <Compile Include="Services\ExchangeCredentialPolicy.cs" />
     <Compile Include="Services\ExchangeProviderAuditService.cs" />
+    <Compile Include="Services\ExchangeServiceNameNormalizer.cs" />
     <Compile Include="Services\ExecutionCostModelService.cs" />
     <Compile Include="Services\ExecutionVenueScorer.cs" />
     <Compile Include="Services\GeoBlockRegistry.cs" />

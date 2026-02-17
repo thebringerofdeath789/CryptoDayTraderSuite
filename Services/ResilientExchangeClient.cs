@@ -83,6 +83,16 @@ namespace CryptoDayTraderSuite.Services
             return ExecuteWithRetry(() => _inner.CancelOrderAsync(orderId));
         }
 
+        public Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
+        {
+            return ExecuteWithRetry(() => _inner.GetOpenOrdersAsync(productId));
+        }
+
+        public Task<Dictionary<string, decimal>> GetBalancesAsync()
+        {
+            return ExecuteWithRetry(() => _inner.GetBalancesAsync());
+        }
+
         private async Task<T> ExecuteWithRetry<T>(Func<Task<T>> action)
         {
             int attempt = 0;
@@ -140,6 +150,11 @@ namespace CryptoDayTraderSuite.Services
                 return (T)(object)new List<Candle>();
             }
 
+            if (type == typeof(List<OpenOrder>))
+            {
+                return (T)(object)new List<OpenOrder>();
+            }
+
             if (type == typeof(Ticker))
             {
                 return (T)(object)new Ticker { Time = DateTime.UtcNow };
@@ -158,6 +173,11 @@ namespace CryptoDayTraderSuite.Services
             if (type == typeof(bool))
             {
                 return (T)(object)false;
+            }
+
+            if (type == typeof(Dictionary<string, decimal>))
+            {
+                return (T)(object)new Dictionary<string, decimal>();
             }
 
             if (type == typeof(OrderResult))

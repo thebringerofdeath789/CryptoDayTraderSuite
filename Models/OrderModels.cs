@@ -26,6 +26,19 @@ namespace CryptoDayTraderSuite.Models
         public string Message { get; set; } /* message */
     }
 
+    public class OpenOrder
+    {
+        public string OrderId { get; set; }
+        public string ProductId { get; set; }
+        public OrderSide Side { get; set; }
+        public OrderType Type { get; set; }
+        public decimal Price { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal FilledQty { get; set; }
+        public DateTime CreatedUtc { get; set; }
+        public string Status { get; set; }
+    }
+
     public class Position
     {
         public string ProductId { get; set; } /* product */

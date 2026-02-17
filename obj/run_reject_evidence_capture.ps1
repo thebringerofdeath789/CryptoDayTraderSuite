@@ -17,16 +17,17 @@
 $ErrorActionPreference = 'Stop'
 
 $CaptureCiVersion = '1'
-$CaptureCiFields = 'result|decision|exit|strict|cycle_fresh|log_fresh|observed|default_exit|strict_exit|report'
+$CaptureCiFields = 'result|decision|exit|effective_exit|original_exit|override|strict|cycle_fresh|log_fresh|observed|default_exit|strict_exit|report|precheck_autorun_known|precheck_autorun_enabled|precheck_runnable_profiles|precheck_fresh_cycle|precheck_cycle_age_min'
+$FreshnessSkewSeconds = 2
+$PostRunEvidenceSettleSeconds = 12
+$EscalationDurationStepSeconds = 90
+$EscalationMaxDurationSeconds = 900
+$EscalationMaxSymbolsCap = 12
 
 trap {
     $message = if ($null -ne $_ -and $null -ne $_.Exception) { $_.Exception.Message } else { "unknown error" }
     Write-Output ('UNHANDLED_ERROR=' + $message)
-    Write-Output 'CAPTURE_RESULT=PARTIAL'
-    Write-Output 'CAPTURE_DECISION=partial-unhandled-error'
-    Write-Output ('CI_VERSION=' + $CaptureCiVersion)
-    Write-Output ('CI_FIELDS=' + $CaptureCiFields)
-    Write-Output ('CI_SUMMARY=version=' + $CaptureCiVersion + ';result=PARTIAL;decision=partial-unhandled-error;exit=6;strict=' + ([int]$RunStrict.IsPresent) + ';cycle=-1;log=-1;observed=none;default_exit=-1;strict_exit=-1;report=none')
+    Emit-CaptureContract -Result 'PARTIAL' -Decision 'partial-unhandled-error' -ExitCode 6 -CycleFresh -1 -LogFresh -1 -Observed 'none' -DefaultExit -1 -StrictExit -1 -ReportPath 'none'
     Complete-Result -Message 'RESULT:PARTIAL unhandled script error during reject evidence capture.' -Code 6 -IsPartial
 }
 
@@ -68,7 +69,7 @@ function Get-LatestFile {
     }
 
     $latest = Get-ChildItem -Path $Folder -Filter $Pattern -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.LastWriteTime -gt $AfterTime } |
+        Where-Object { $_.LastWriteTimeUtc -ge $AfterTime.ToUniversalTime().AddSeconds(-1 * $FreshnessSkewSeconds) } |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
 
@@ -79,6 +80,25 @@ function Get-LatestFile {
     return Get-ChildItem -Path $Folder -Filter $Pattern -File -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
+}
+
+function Read-KeyValueFromOutput {
+    param(
+        [string]$Output,
+        [string]$Key,
+        [string]$DefaultValue = ''
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Output) -or [string]::IsNullOrWhiteSpace($Key)) {
+        return $DefaultValue
+    }
+
+    $match = ($Output -split "`r?`n" | Where-Object { $_ -like ($Key + '=*') } | Select-Object -Last 1)
+    if ([string]::IsNullOrWhiteSpace($match)) {
+        return $DefaultValue
+    }
+
+    return $match.Substring($Key.Length + 1)
 }
 
 function Get-ZeroedCounts {
@@ -292,15 +312,28 @@ function Emit-CaptureContract {
     $decisionText = if ([string]::IsNullOrWhiteSpace($Decision)) { 'unknown' } else { $Decision.Trim().ToLowerInvariant() }
     $observedText = if ([string]::IsNullOrWhiteSpace($Observed)) { 'none' } else { $Observed }
     $reportText = if ([string]::IsNullOrWhiteSpace($ReportPath)) { 'none' } else { $ReportPath }
+    $isPartial = [string]::Equals($resultText, 'PARTIAL', [System.StringComparison]::OrdinalIgnoreCase)
+    $effectiveExit = $ExitCode
+    $overrideText = '0'
+    if ($isPartial -and $ExitCode -ne 0 -and $AllowPartialExitCodeZero.IsPresent) {
+        $effectiveExit = 0
+        $overrideText = '1'
+    }
 
     Write-Output ('CAPTURE_RESULT=' + $resultText)
     Write-Output ('CAPTURE_DECISION=' + $decisionText)
     Write-Output ('CI_VERSION=' + $CaptureCiVersion)
     Write-Output ('CI_FIELDS=' + $CaptureCiFields)
-    Write-Output ('CI_SUMMARY=version=' + $CaptureCiVersion + ';result=' + $resultText + ';decision=' + $decisionText + ';exit=' + $ExitCode + ';strict=' + ([int]$RunStrict.IsPresent) + ';cycle=' + $CycleFresh + ';log=' + $LogFresh + ';observed=' + $observedText + ';default_exit=' + $DefaultExit + ';strict_exit=' + $StrictExit + ';report=' + $reportText)
+    Write-Output ('CI_SUMMARY=version=' + $CaptureCiVersion + ';result=' + $resultText + ';decision=' + $decisionText + ';exit=' + $effectiveExit + ';effective_exit=' + $effectiveExit + ';original_exit=' + $ExitCode + ';override=' + $overrideText + ';strict=' + ([int]$RunStrict.IsPresent) + ';cycle=' + $CycleFresh + ';log=' + $LogFresh + ';observed=' + $observedText + ';default_exit=' + $DefaultExit + ';strict_exit=' + $StrictExit + ';report=' + $reportText + ';precheck_autorun_known=' + $precheckAutoRunKnown + ';precheck_autorun_enabled=' + $precheckAutoRunEnabled + ';precheck_runnable_profiles=' + $precheckRunnableProfiles + ';precheck_fresh_cycle=' + $precheckHasFreshCycle + ';precheck_cycle_age_min=' + $precheckCycleAgeMin)
 }
 
 Set-Location $RepoRoot
+
+$precheckAutoRunKnown = -1
+$precheckAutoRunEnabled = -1
+$precheckRunnableProfiles = -1
+$precheckHasFreshCycle = -1
+$precheckCycleAgeMin = -1
 
 if (-not $SkipAutoRunPrecheck.IsPresent) {
     $precheckScript = Join-Path $RepoRoot "obj\precheck_reject_evidence_capture.ps1"
@@ -314,6 +347,11 @@ if (-not $SkipAutoRunPrecheck.IsPresent) {
                     Write-Output $_
                 }
             }
+            $precheckAutoRunKnown = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_AUTORUN_KNOWN' -DefaultValue '-1')
+            $precheckAutoRunEnabled = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_AUTORUN_ENABLED' -DefaultValue '-1')
+            $precheckRunnableProfiles = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_RUNNABLE_PROFILE_COUNT' -DefaultValue '-1')
+            $precheckHasFreshCycle = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_HAS_FRESH_CYCLE' -DefaultValue '-1')
+            $precheckCycleAgeMin = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_LATEST_CYCLE_AGE_MIN' -DefaultValue '-1')
         }
 
         if ($precheckExit -ne 0 -and $AutoRepairBindings.IsPresent) {
@@ -337,6 +375,11 @@ if (-not $SkipAutoRunPrecheck.IsPresent) {
                             Write-Output $_
                         }
                     }
+                    $precheckAutoRunKnown = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_AUTORUN_KNOWN' -DefaultValue '-1')
+                    $precheckAutoRunEnabled = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_AUTORUN_ENABLED' -DefaultValue '-1')
+                    $precheckRunnableProfiles = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_RUNNABLE_PROFILE_COUNT' -DefaultValue '-1')
+                    $precheckHasFreshCycle = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_HAS_FRESH_CYCLE' -DefaultValue '-1')
+                    $precheckCycleAgeMin = [int](Read-KeyValueFromOutput -Output $precheckOutput -Key 'PRECHECK_LATEST_CYCLE_AGE_MIN' -DefaultValue '-1')
                 }
             }
         }
@@ -437,10 +480,20 @@ $cycleObserved = ""
 $logObserved = ""
 $mergedObserved = ""
 $runtimeAttemptUsed = 0
+$effectiveDurationSeconds = $DurationSeconds
+$effectiveAutoModeMaxSymbols = $AutoModeMaxSymbols
+$effectiveRuntimeCaptureAttempts = $RuntimeCaptureAttempts
+$fallbackSecondPassEnabled = $false
 
-for ($runtimeAttempt = 1; $runtimeAttempt -le $RuntimeCaptureAttempts; $runtimeAttempt++) {
+if ($UseFastProfileOverride.IsPresent -and $RuntimeCaptureAttempts -lt 2) {
+    $effectiveRuntimeCaptureAttempts = 2
+    $fallbackSecondPassEnabled = $true
+    Write-Output ('RUNTIME_CAPTURE_FALLBACK_MODE=enabled;reason=fast-profile-single-attempt;attempts=' + $RuntimeCaptureAttempts + '->' + $effectiveRuntimeCaptureAttempts)
+}
+
+for ($runtimeAttempt = 1; $runtimeAttempt -le $effectiveRuntimeCaptureAttempts; $runtimeAttempt++) {
     $runtimeAttemptUsed = $runtimeAttempt
-    $before = Get-Date
+    $before = [DateTime]::UtcNow
 
     Get-Process CryptoDayTraderSuite -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Seconds 2
@@ -457,7 +510,10 @@ for ($runtimeAttempt = 1; $runtimeAttempt -le $RuntimeCaptureAttempts; $runtimeA
             Write-Output ('FAST_PROFILE_OVERRIDE_RESTORED=0 error=' + $_.Exception.Message)
         }
     }
-    Start-Sleep -Seconds $DurationSeconds
+    $profileMode = if ($fallbackSecondPassEnabled -and $runtimeAttempt -ge 2) { 'normal-fallback' } elseif ($UseFastProfileOverride.IsPresent) { 'fast-override' } else { 'normal' }
+    Write-Output ('RUNTIME_CAPTURE_PARAMS=attempt=' + $runtimeAttempt + ';durationSec=' + $effectiveDurationSeconds + ';maxSymbols=' + $effectiveAutoModeMaxSymbols + ';profileMode=' + $profileMode)
+    $env:CDTS_AUTOMODE_MAX_SYMBOLS = $effectiveAutoModeMaxSymbols.ToString()
+    Start-Sleep -Seconds $effectiveDurationSeconds
 
     if ($app -and -not $app.HasExited) {
         try { $null = $app.CloseMainWindow() } catch { }
@@ -475,12 +531,24 @@ for ($runtimeAttempt = 1; $runtimeAttempt -le $RuntimeCaptureAttempts; $runtimeA
 
     $cycleIsFresh = $false
     if ($null -ne $newCycle) {
-        $cycleIsFresh = $newCycle.LastWriteTime -gt $before
+        $cycleIsFresh = $newCycle.LastWriteTimeUtc -ge $before.AddSeconds(-1 * $FreshnessSkewSeconds)
     }
 
     $logIsFresh = $false
     if ($null -ne $newLog) {
-        $logIsFresh = $newLog.LastWriteTime -gt $before
+        $logIsFresh = $newLog.LastWriteTimeUtc -ge $before.AddSeconds(-1 * $FreshnessSkewSeconds)
+    }
+
+    if (-not $cycleIsFresh -and -not $logIsFresh -and $PostRunEvidenceSettleSeconds -gt 0) {
+        Start-Sleep -Seconds $PostRunEvidenceSettleSeconds
+        $newCycle = Get-LatestFile -Folder $cycleDir -Pattern 'cycle_*.json' -AfterTime $before
+        $newLog = Get-LatestFile -Folder $logDir -Pattern 'log_*.txt' -AfterTime $before
+        if ($null -ne $newCycle) {
+            $cycleIsFresh = $newCycle.LastWriteTimeUtc -ge $before.AddSeconds(-1 * $FreshnessSkewSeconds)
+        }
+        if ($null -ne $newLog) {
+            $logIsFresh = $newLog.LastWriteTimeUtc -ge $before.AddSeconds(-1 * $FreshnessSkewSeconds)
+        }
     }
 
     $cyclePath = if ($null -ne $newCycle) { $newCycle.FullName } else { "" }
@@ -498,18 +566,80 @@ for ($runtimeAttempt = 1; $runtimeAttempt -le $RuntimeCaptureAttempts; $runtimeA
     $logObserved = Format-ObservedCounts -Counts $logCounts
     $mergedObserved = Format-ObservedCounts -Counts $merged
 
-    Write-Output ('RUNTIME_CAPTURE_ATTEMPT=' + $runtimeAttempt + '/' + $RuntimeCaptureAttempts + ' cycleFresh=' + [int]$cycleIsFresh + ' logFresh=' + [int]$logIsFresh + ' observed=' + $(if ([string]::IsNullOrWhiteSpace($mergedObserved)) { 'none' } else { $mergedObserved }))
+    Write-Output ('RUNTIME_CAPTURE_ATTEMPT=' + $runtimeAttempt + '/' + $effectiveRuntimeCaptureAttempts + ' cycleFresh=' + [int]$cycleIsFresh + ' logFresh=' + [int]$logIsFresh + ' observed=' + $(if ([string]::IsNullOrWhiteSpace($mergedObserved)) { 'none' } else { $mergedObserved }))
 
     $hasFreshEvidence = $cycleIsFresh -or $logIsFresh
     $hasObservedRejects = -not [string]::IsNullOrWhiteSpace($mergedObserved)
     $hasSufficientEvidence = $cycleIsFresh -or $hasObservedRejects
-    if ($hasSufficientEvidence -or $runtimeAttempt -eq $RuntimeCaptureAttempts) {
+    if ($hasSufficientEvidence -or $runtimeAttempt -eq $effectiveRuntimeCaptureAttempts) {
         break
+    }
+
+    $precheckHealthy = ($precheckAutoRunKnown -eq 1 -and $precheckAutoRunEnabled -eq 1 -and $precheckRunnableProfiles -gt 0)
+    if ($precheckHealthy -and -not $cycleIsFresh) {
+        $newDuration = [Math]::Min($EscalationMaxDurationSeconds, ($effectiveDurationSeconds + $EscalationDurationStepSeconds))
+        $newMaxSymbols = [Math]::Min($EscalationMaxSymbolsCap, ($effectiveAutoModeMaxSymbols + 1))
+        if ($newDuration -ne $effectiveDurationSeconds -or $newMaxSymbols -ne $effectiveAutoModeMaxSymbols) {
+            Write-Output ('RUNTIME_CAPTURE_ESCALATION=attempt=' + $runtimeAttempt + ';reason=precheck-healthy-no-fresh-cycle;durationSec=' + $effectiveDurationSeconds + '->' + $newDuration + ';maxSymbols=' + $effectiveAutoModeMaxSymbols + '->' + $newMaxSymbols)
+            $effectiveDurationSeconds = $newDuration
+            $effectiveAutoModeMaxSymbols = $newMaxSymbols
+        }
     }
 
     if ($RuntimeRetryDelaySeconds -gt 0) {
         Start-Sleep -Seconds $RuntimeRetryDelaySeconds
     }
+}
+
+if ([string]::IsNullOrWhiteSpace($mergedObserved)) {
+    $warmupDurationSeconds = [Math]::Min(120, [Math]::Max(45, [int][Math]::Round($effectiveDurationSeconds / 2.0)))
+    $warmupMaxSymbols = [Math]::Min($EscalationMaxSymbolsCap, [Math]::Max($effectiveAutoModeMaxSymbols, 6))
+    Write-Output ('RUNTIME_EVIDENCE_WARMUP=1;durationSec=' + $warmupDurationSeconds + ';maxSymbols=' + $warmupMaxSymbols)
+
+    $beforeWarmup = [DateTime]::UtcNow
+    Get-Process CryptoDayTraderSuite -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Seconds 2
+
+    $env:CDTS_AUTOMODE_MAX_SYMBOLS = $warmupMaxSymbols.ToString()
+    $warmupApp = Start-Process -FilePath $exePath -PassThru
+    Start-Sleep -Seconds $warmupDurationSeconds
+
+    if ($warmupApp -and -not $warmupApp.HasExited) {
+        try { $null = $warmupApp.CloseMainWindow() } catch { }
+        Start-Sleep -Seconds 4
+    }
+    if ($warmupApp -and -not $warmupApp.HasExited) {
+        Stop-Process -Id $warmupApp.Id -Force
+    }
+    Start-Sleep -Seconds 2
+    Get-Process CryptoDayTraderSuite -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Seconds 2
+
+    $newCycle = Get-LatestFile -Folder $cycleDir -Pattern 'cycle_*.json' -AfterTime $beforeWarmup
+    $newLog = Get-LatestFile -Folder $logDir -Pattern 'log_*.txt' -AfterTime $beforeWarmup
+
+    if ($null -ne $newCycle) {
+        $cycleIsFresh = $newCycle.LastWriteTimeUtc -ge $beforeWarmup.AddSeconds(-1 * $FreshnessSkewSeconds)
+    }
+    if ($null -ne $newLog) {
+        $logIsFresh = $newLog.LastWriteTimeUtc -ge $beforeWarmup.AddSeconds(-1 * $FreshnessSkewSeconds)
+    }
+
+    $cyclePath = if ($null -ne $newCycle) { $newCycle.FullName } else { $cyclePath }
+    $logPath = if ($null -ne $newLog) { $newLog.FullName } else { $logPath }
+
+    $cycleCounts = Read-RejectCountsFromCycle -CyclePath $cyclePath
+    $logCounts = Read-RejectCountsFromLog -LogPath $logPath
+    $merged = Get-ZeroedCounts
+    foreach ($c in $categories) {
+        $merged[$c] = [Math]::Max([int]$cycleCounts[$c], [int]$logCounts[$c])
+    }
+
+    $cycleObserved = Format-ObservedCounts -Counts $cycleCounts
+    $logObserved = Format-ObservedCounts -Counts $logCounts
+    $mergedObserved = Format-ObservedCounts -Counts $merged
+
+    Write-Output ('RUNTIME_EVIDENCE_WARMUP_RESULT=cycleFresh=' + [int]$cycleIsFresh + ';logFresh=' + [int]$logIsFresh + ';observed=' + $(if ([string]::IsNullOrWhiteSpace($mergedObserved)) { 'none' } else { $mergedObserved }))
 }
 
 $providerProbeOutput = ""
@@ -560,11 +690,17 @@ Write-Output ('LOG_IS_FRESH=' + ([int]$logIsFresh))
 Write-Output ('CYCLE_AGE_MIN=' + (Get-FileAgeMinutes -Path $cyclePath))
 Write-Output ('LOG_AGE_MIN=' + (Get-FileAgeMinutes -Path $logPath))
 Write-Output ('RUNTIME_CAPTURE_ATTEMPTS_USED=' + $runtimeAttemptUsed)
-Write-Output ('RUNTIME_CAPTURE_ATTEMPTS_MAX=' + $RuntimeCaptureAttempts)
+Write-Output ('RUNTIME_CAPTURE_ATTEMPTS_MAX=' + $effectiveRuntimeCaptureAttempts)
+Write-Output ('RUNTIME_CAPTURE_FALLBACK_SECOND_PASS=' + ([int]$fallbackSecondPassEnabled))
 Write-Output ('AUTOMODE_MAX_SYMBOLS=' + $AutoModeMaxSymbols)
 Write-Output ('REJECT_OBSERVED_CYCLE=' + $(if ([string]::IsNullOrWhiteSpace($cycleObserved)) { 'none' } else { $cycleObserved }))
 Write-Output ('REJECT_OBSERVED_LOG=' + $(if ([string]::IsNullOrWhiteSpace($logObserved)) { 'none' } else { $logObserved }))
 Write-Output ('REJECT_OBSERVED_MERGED=' + $(if ([string]::IsNullOrWhiteSpace($mergedObserved)) { 'none' } else { $mergedObserved }))
+Write-Output ('PRECHECK_AUTORUN_KNOWN_CAPTURE=' + $precheckAutoRunKnown)
+Write-Output ('PRECHECK_AUTORUN_ENABLED_CAPTURE=' + $precheckAutoRunEnabled)
+Write-Output ('PRECHECK_RUNNABLE_PROFILES_CAPTURE=' + $precheckRunnableProfiles)
+Write-Output ('PRECHECK_FRESH_CYCLE_CAPTURE=' + $precheckHasFreshCycle)
+Write-Output ('PRECHECK_CYCLE_AGE_MIN_CAPTURE=' + $precheckCycleAgeMin)
 
 if ($shouldRunProviderProbe) {
     if (-not [string]::IsNullOrWhiteSpace($providerProbeReportLine)) { Write-Output $providerProbeReportLine }
@@ -602,6 +738,11 @@ if ($profileOverrideApplied) {
     else {
         Write-Output 'FAST_PROFILE_OVERRIDE_RESTORED_FINAL=0 reason=backup-not-found'
     }
+}
+
+if ($defaultCertExit -ne 0) {
+    Emit-CaptureContract -Result 'PARTIAL' -Decision 'partial-default-cert-failed' -ExitCode 7 -CycleFresh ([int]$cycleIsFresh) -LogFresh ([int]$logIsFresh) -Observed $(if ([string]::IsNullOrWhiteSpace($mergedObserved)) { 'none' } else { $mergedObserved }) -DefaultExit $defaultCertExit -StrictExit $strictCertExit -ReportPath $defaultReportPath
+    Complete-Result -Message 'RESULT:PARTIAL default certification failed during reject evidence capture.' -Code 7 -IsPartial
 }
 
 if ([string]::IsNullOrWhiteSpace($mergedObserved)) {

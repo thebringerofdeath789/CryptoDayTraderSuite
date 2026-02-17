@@ -204,10 +204,76 @@ namespace CryptoDayTraderSuite.Exchanges
             return json.Contains("true"); /* naive */
         }
 
-        public async Task<List<Dictionary<string, object>>> GetOpenOrdersAsync()
+        public async Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
         {
             var json = await PrivatePostAsync("/v2/open_orders/all/", new Dictionary<string, string>());
-            return UtilCompat.JsonDeserialize<List<Dictionary<string, object>>>(json);
+            var items = UtilCompat.JsonDeserialize<List<Dictionary<string, object>>>(json) ?? new List<Dictionary<string, object>>();
+            var list = new List<OpenOrder>();
+            foreach (var item in items)
+            {
+                if (item == null) continue;
+                string currencyPair = GetString(item, "currency_pair");
+                string productIdRaw = string.IsNullOrWhiteSpace(currencyPair) ? "" : currencyPair.Replace("/", "-").ToUpperInvariant();
+
+                if (!string.IsNullOrWhiteSpace(productId) && !string.Equals(productIdRaw, productId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string orderId = GetString(item, "id");
+                string typeStr = GetString(item, "type");
+                decimal price = ToDecimal(GetString(item, "price"));
+                decimal qty = ToDecimal(GetString(item, "amount"));
+                string datetimeStr = GetString(item, "datetime");
+                DateTime created; 
+                if (!DateTime.TryParse(datetimeStr, out created)) created = DateTime.UtcNow;
+
+                list.Add(new OpenOrder
+                {
+                    OrderId = orderId,
+                    ProductId = productIdRaw,
+                    Side = (typeStr == "0") ? OrderSide.Buy : OrderSide.Sell,
+                    Type = OrderType.Limit, // Bitstamp mostly limit
+                    Price = price,
+                    Quantity = qty,
+                    FilledQty = 0m, // Not returned in list usually
+                    CreatedUtc = created,
+                    Status = "OPEN"
+                });
+            }
+            return list;
+        }
+
+        private static string GetString(Dictionary<string, object> item, string key)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(key))
+            {
+                return string.Empty;
+            }
+
+            object value;
+            if (!item.TryGetValue(key, out value) || value == null)
+            {
+                return string.Empty;
+            }
+
+            return value.ToString();
+        }
+
+        private static decimal ToDecimal(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return 0m;
+            }
+
+            decimal parsed;
+            if (decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out parsed))
+            {
+                return parsed;
+            }
+
+            return 0m;
         }
     }
 }

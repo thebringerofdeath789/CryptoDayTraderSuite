@@ -256,29 +256,86 @@ namespace CryptoDayTraderSuite.Exchanges
                     var currency = GetString(coin, "coin");
                     if (string.IsNullOrWhiteSpace(currency)) continue;
 
-                    var available = ToDecimal(GetString(coin, "transferBalance"));
-                    if (available <= 0m)
+                    /* 
+                       Standardize on Total Equity (Wallet Balance) to match Binance/Coinbase semantics. 
+                       Original logic returned 'transferBalance' (Available) which caused sizing to collapse 
+                       when positions were open.
+                    */
+                    var total = ToDecimal(GetString(coin, "walletBalance"));
+                    if (total <= 0m)
                     {
-                        available = ToDecimal(GetString(coin, "walletBalance"));
+                        total = ToDecimal(GetString(coin, "equity"));
                     }
-                    if (available <= 0m)
+                    if (total <= 0m)
                     {
-                        available = ToDecimal(GetString(coin, "equity"));
+                        /* Fallback to transferBalance only if total is missing/zero (e.g. Funding account) */
+                        total = ToDecimal(GetString(coin, "transferBalance"));
                     }
 
                     decimal existing;
                     if (balances.TryGetValue(currency, out existing))
                     {
-                        balances[currency] = existing + available;
+                        balances[currency] = existing + total;
                     }
                     else
                     {
-                        balances[currency] = available;
+                        balances[currency] = total;
                     }
                 }
             }
 
             return balances;
+        }
+
+        public async Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
+        {
+            EnsureCredentials();
+
+            var query = "category=spot";
+            if (!string.IsNullOrWhiteSpace(productId))
+            {
+                query += "&symbol=" + NormalizeProduct(productId);
+            }
+
+            var req = BuildSignedRequest(HttpMethod.Get, "/v5/order/realtime", query, string.Empty);
+            var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
+            var result = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
+
+            var list = new List<OpenOrder>();
+            var data = GetMap(result, "result");
+            if (data != null && data.ContainsKey("list"))
+            {
+                var orders = ToObjectArray(data["list"]);
+                foreach (var item in orders)
+                {
+                    var map = item as Dictionary<string, object>;
+                    if (map == null) continue;
+
+                    var orderId = GetString(map, "orderId");
+                    var symbol = GetString(map, "symbol");
+                    var side = GetString(map, "side");
+                    var type = GetString(map, "orderType");
+                    var price = ToDecimal(GetString(map, "price"));
+                    var qty = ToDecimal(GetString(map, "qty"));
+                    var filled = ToDecimal(GetString(map, "cumExecQty"));
+                    var status = GetString(map, "orderStatus");
+                    var created = ToDecimal(GetString(map, "createdTime"));
+
+                    list.Add(new OpenOrder
+                    {
+                        OrderId = orderId,
+                        ProductId = symbol,
+                        Side = "BUY".Equals(side, StringComparison.OrdinalIgnoreCase) ? OrderSide.Buy : OrderSide.Sell,
+                        Type = "MARKET".Equals(type, StringComparison.OrdinalIgnoreCase) ? OrderType.Market : OrderType.Limit,
+                        Price = price,
+                        Quantity = qty,
+                        FilledQty = filled,
+                        Status = status,
+                        CreatedUtc = DateTimeOffset.FromUnixTimeMilliseconds((long)created).UtcDateTime
+                    });
+                }
+            }
+            return list;
         }
 
         public async Task<OrderResult> PlaceOrderAsync(OrderRequest order)
@@ -562,11 +619,25 @@ namespace CryptoDayTraderSuite.Exchanges
             return req;
         }
 
-        private async Task<Dictionary<string, object>> GetInstrumentsInfoAsync()
+        private async Task<Dictionary<string, object>> GetInstrumentsInfoAsync(string category = "spot")
         {
-            var url = _restBaseUrl + "/v5/market/instruments-info?category=spot&limit=1000";
+            var normalizedCategory = string.IsNullOrWhiteSpace(category) ? "spot" : category.Trim().ToLowerInvariant();
+            var url = _restBaseUrl + "/v5/market/instruments-info?category=" + Uri.EscapeDataString(normalizedCategory) + "&limit=1000";
             var json = await HttpUtil.GetAsync(url).ConfigureAwait(false);
-            return UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+            var root = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+            if (root == null)
+            {
+                throw new InvalidOperationException("Bybit instruments-info returned empty response payload.");
+            }
+
+            if (!IsBybitSuccess(root))
+            {
+                var code = GetString(root, "retCode");
+                var message = GetString(root, "retMsg");
+                throw new InvalidOperationException("Bybit instruments-info failed (category=" + normalizedCategory + ", retCode=" + code + "): " + message);
+            }
+
+            return root;
         }
 
         private async Task EnsureSymbolConstraintsCacheAsync()

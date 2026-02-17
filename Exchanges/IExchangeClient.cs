@@ -59,6 +59,19 @@ namespace CryptoDayTraderSuite.Exchanges
         Task<bool> CancelOrderAsync(string orderId);
 
         /// <summary>
+        /// Get all open orders for a product (or all products if null).
+        /// </summary>
+        /// <param name="productId">Optional product symbol filter.</param>
+        /// <returns>List of open orders.</returns>
+        Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null);
+
+        /// <summary>
+        /// Get current account balances.
+        /// </summary>
+        /// <returns>Dictionary of currency to balance.</returns>
+        Task<Dictionary<string, decimal>> GetBalancesAsync();
+
+        /// <summary>
         /// Set API credentials for the client.
         /// </summary>
         /// <param name="apiKey">API key.</param>

@@ -261,6 +261,53 @@ namespace CryptoDayTraderSuite.Exchanges
             return balances;
         }
 
+        public async Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
+        {
+            EnsureCredentials();
+
+            var query = "instType=SPOT";
+            if (!string.IsNullOrWhiteSpace(productId))
+            {
+                query += "&instId=" + NormalizeProduct(productId);
+            }
+
+            var req = BuildSignedRequest(HttpMethod.Get, "/api/v5/trade/orders-pending?" + query, string.Empty);
+            var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
+            var result = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
+
+            var list = new List<OpenOrder>();
+            var data = ToObjectArray(result.ContainsKey("data") ? result["data"] : null);
+            foreach (var item in data)
+            {
+                var map = item as Dictionary<string, object>;
+                if (map == null) continue;
+
+                var orderId = GetString(map, "ordId");
+                var instId = GetString(map, "instId");
+                var side = GetString(map, "side");
+                var type = GetString(map, "ordType");
+                var price = ToDecimal(GetString(map, "px"));
+                var qty = ToDecimal(GetString(map, "sz"));
+                var filled = ToDecimal(GetString(map, "accFillSz"));
+                var status = GetString(map, "state");
+                var created = ToDecimal(GetString(map, "cTime"));
+
+                list.Add(new OpenOrder
+                {
+                    OrderId = orderId,
+                    ProductId = instId,
+                    Side = "buy".Equals(side, StringComparison.OrdinalIgnoreCase) ? OrderSide.Buy : OrderSide.Sell,
+                    Type = "market".Equals(type, StringComparison.OrdinalIgnoreCase) ? OrderType.Market : OrderType.Limit,
+                    Price = price,
+                    Quantity = qty,
+                    FilledQty = filled,
+                    Status = status,
+                    CreatedUtc = DateTimeOffset.FromUnixTimeMilliseconds((long)created).UtcDateTime
+                });
+            }
+            return list;
+        }
+
         public async Task<OrderResult> PlaceOrderAsync(OrderRequest order)
         {
             if (order == null) throw new ArgumentNullException(nameof(order));

@@ -39,6 +39,15 @@ namespace CryptoDayTraderSuite.UI
                     if (c is Button b)
                     {
                         b.Margin = Padding.Empty;
+                        if (b != btnMenu && b.Tag == null)
+                        {
+                            var label = (b.Text ?? string.Empty).Trim();
+                            if (label.StartsWith("  "))
+                            {
+                                label = label.Substring(2).Trim();
+                            }
+                            b.Tag = label;
+                        }
                     }
                 }
             }
@@ -114,7 +123,8 @@ namespace CryptoDayTraderSuite.UI
                     }
                     else
                     {
-                        b.Text = _isExpanded ? "  " + b.Name.Replace("btn", "") : "";
+                        var label = Convert.ToString(b.Tag) ?? b.Name.Replace("btn", "");
+                        b.Text = _isExpanded ? "  " + label : "";
                         b.TextAlign = _isExpanded ? ContentAlignment.MiddleLeft : ContentAlignment.MiddleCenter;
                     }
                     

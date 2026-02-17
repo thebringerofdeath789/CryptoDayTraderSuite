@@ -30,7 +30,7 @@ namespace CryptoDayTraderSuite.Services
         {
             if (string.IsNullOrEmpty(brokerName)) brokerName = "Coinbase";
             var rawBrokerName = brokerName;
-            brokerName = NormalizeBrokerName(brokerName);
+            brokerName = ExchangeServiceNameNormalizer.NormalizeBrokerName(brokerName);
             if (GeoBlockRegistry.IsDisabled(brokerName))
             {
                 var reason = GeoBlockRegistry.GetDisableReason(brokerName);
@@ -87,7 +87,7 @@ namespace CryptoDayTraderSuite.Services
         public IExchangeClient CreatePublicClient(string brokerName)
         {
             if (string.IsNullOrEmpty(brokerName)) brokerName = "Coinbase";
-            brokerName = NormalizeBrokerName(brokerName);
+            brokerName = ExchangeServiceNameNormalizer.NormalizeBrokerName(brokerName);
             if (GeoBlockRegistry.IsDisabled(brokerName))
             {
                 var reason = GeoBlockRegistry.GetDisableReason(brokerName);
@@ -96,52 +96,6 @@ namespace CryptoDayTraderSuite.Services
             }
             Log.Info($"[Connection] Public client created for {brokerName}");
             return Factory(brokerName, null, null, null);
-        }
-
-        private string NormalizeBrokerName(string brokerName)
-        {
-            if (string.IsNullOrWhiteSpace(brokerName)) return "Coinbase";
-
-            var key = brokerName.Trim().ToLowerInvariant();
-            switch (key)
-            {
-                case "coinbase advanced":
-                case "coinbase-advanced":
-                case "coinbase_advanced":
-                case "coinbaseadvanced":
-                case "coinbase exchange":
-                case "coinbase-exchange":
-                case "coinbase_exchange":
-                    return "Coinbase";
-                case "kraken":
-                    return "Kraken";
-                case "bitstamp":
-                    return "Bitstamp";
-                case "binance":
-                    return "Binance";
-                case "binance us":
-                case "binance_us":
-                case "binance-us":
-                    return "Binance-US";
-                case "binance global":
-                case "binance_global":
-                case "binance-global":
-                    return "Binance-Global";
-                case "bybit":
-                    return "Bybit";
-                case "bybit global":
-                case "bybit_global":
-                case "bybit-global":
-                    return "Bybit-Global";
-                case "okx":
-                    return "OKX";
-                case "okx global":
-                case "okx_global":
-                case "okx-global":
-                    return "OKX-Global";
-                default:
-                    return brokerName.Trim();
-            }
         }
 
         private IExchangeClient Factory(string brokerName, string key, string secret, string pass)

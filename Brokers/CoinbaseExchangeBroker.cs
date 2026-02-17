@@ -230,11 +230,10 @@ namespace CryptoDayTraderSuite.Brokers
                 {
                     if (order == null) continue;
 
-                    var orderId = ReadOrderId(order);
+                    var orderId = order.OrderId;
                     if (string.IsNullOrWhiteSpace(orderId)) continue;
 
-                    var productId = ReadStringValue(order, "product_id");
-                    if (string.IsNullOrWhiteSpace(productId)) productId = ReadStringValue(order, "productId");
+                    var productId = order.ProductId;
                     productId = NormalizeCoinbaseSymbol(productId);
 
                     if (!string.IsNullOrWhiteSpace(normalizedSymbol))
@@ -290,53 +289,6 @@ namespace CryptoDayTraderSuite.Brokers
                 .ToUpperInvariant();
         }
 
-        private string ReadOrderId(System.Collections.Generic.Dictionary<string, object> row)
-        {
-            var value = ReadStringValue(row, "id");
-            if (string.IsNullOrWhiteSpace(value)) value = ReadStringValue(row, "order_id");
-            if (string.IsNullOrWhiteSpace(value)) value = ReadStringValue(row, "orderId");
-            return value;
-        }
-
-        private string ReadStringValue(System.Collections.Generic.Dictionary<string, object> row, string key)
-        {
-            if (row == null || string.IsNullOrWhiteSpace(key)) return string.Empty;
-
-            object raw;
-            if (TryGetObjectValue(row, key, out raw) && raw != null)
-            {
-                return raw.ToString();
-            }
-
-            return string.Empty;
-        }
-
-        private bool TryGetObjectValue(System.Collections.Generic.Dictionary<string, object> row, string key, out object value)
-        {
-            value = null;
-            if (row == null || string.IsNullOrWhiteSpace(key))
-            {
-                return false;
-            }
-
-            if (row.ContainsKey(key))
-            {
-                value = row[key];
-                return value != null;
-            }
-
-            foreach (var pair in row)
-            {
-                if (pair.Key == null) continue;
-                if (string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase))
-                {
-                    value = pair.Value;
-                    return value != null;
-                }
-            }
-
-            return false;
-        }
     }
 }
 

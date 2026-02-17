@@ -65,5 +65,15 @@ namespace CryptoDayTraderSuite.Services
         {
             return Task.FromResult(false);
         }
+
+        public Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
+        {
+            return Task.FromResult(new List<OpenOrder>());
+        }
+
+        public Task<Dictionary<string, decimal>> GetBalancesAsync()
+        {
+            return Task.FromResult(new Dictionary<string, decimal>());
+        }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using CryptoDayTraderSuite.Models;
@@ -17,6 +18,8 @@ namespace CryptoDayTraderSuite.UI
         private IKeyService _keyService;
         private IHistoryService _historyService;
         private CoinbaseReadOnlyImportService _coinbaseReadOnlyImportService;
+        private IExchangeProvider _exchangeProvider;
+        private AccountBuyingPowerService _accountBuyingPowerService;
         private BindingSource _holdingsBinding = new BindingSource();
 
         private sealed class HoldingViewRow
@@ -40,12 +43,23 @@ namespace CryptoDayTraderSuite.UI
             _coinbaseReadOnlyImportService = (_service != null && _keyService != null)
                 ? new CoinbaseReadOnlyImportService(_keyService, _service, _historyService)
                 : null;
+            _exchangeProvider = _keyService != null ? new ExchangeProvider(_keyService) : null;
+            _accountBuyingPowerService = _keyService != null ? new AccountBuyingPowerService(_keyService) : null;
 
             if (btnImportCoinbase != null)
             {
                 btnImportCoinbase.Enabled = _coinbaseReadOnlyImportService != null;
             }
             LoadData();
+        }
+
+        public void SetInsightsOnlyMode(bool insightsOnly)
+        {
+            if (btnAdd != null) btnAdd.Visible = !insightsOnly;
+            if (btnEdit != null) btnEdit.Visible = !insightsOnly;
+            if (btnDelete != null) btnDelete.Visible = !insightsOnly;
+            if (btnSave != null) btnSave.Visible = !insightsOnly;
+            if (btnRefresh != null) btnRefresh.Visible = !insightsOnly;
         }
 
         private void ConfigureGrid()
@@ -105,10 +119,11 @@ namespace CryptoDayTraderSuite.UI
             btnRefresh.Click += (s, e) => LoadData();
             btnSave.Click += (s, e) => SaveChanges();
             btnImportCoinbase.Click += async (s, e) => await ImportCoinbaseReadOnlyAsync();
+            btnRefreshInsights.Click += async (s, e) => await RefreshSelectedAccountInsightsAsync(forceLiveValidation: true);
 
             gridAccounts.DoubleClick += (s, e) => EditSelected();
             gridAccounts.CurrentCellDirtyStateChanged += GridAccounts_CurrentCellDirtyStateChanged;
-            gridAccounts.SelectionChanged += (s, e) => RefreshSelectedAccountInsights();
+            gridAccounts.SelectionChanged += async (s, e) => await RefreshSelectedAccountInsightsAsync();
         }
 
         private void GridAccounts_CurrentCellDirtyStateChanged(object sender, EventArgs e)
@@ -128,7 +143,7 @@ namespace CryptoDayTraderSuite.UI
             // Use SortableBindingList to support column sorting
             _bs.DataSource = new SortableBindingList<AccountProfile>(profiles);
             gridAccounts.DataSource = _bs;
-            RefreshSelectedAccountInsights();
+            _ = RefreshSelectedAccountInsightsAsync();
         }
 
         private AccountProfile Selected()
@@ -179,7 +194,7 @@ namespace CryptoDayTraderSuite.UI
             _service.ReplaceAll(accountInfos);
 
             MessageBox.Show("Accounts saved.", "Save", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            RefreshSelectedAccountInsights();
+            _ = RefreshSelectedAccountInsightsAsync();
         }
 
         private async Task ImportCoinbaseReadOnlyAsync()
@@ -198,7 +213,7 @@ namespace CryptoDayTraderSuite.UI
             {
                 var result = await _coinbaseReadOnlyImportService.ValidateAndImportAsync().ConfigureAwait(true);
                 LoadData();
-                RefreshSelectedAccountInsights();
+                await RefreshSelectedAccountInsightsAsync().ConfigureAwait(true);
 
                 var message = "Coinbase read-only validation succeeded.\n\n"
                     + "Key: " + result.KeyId + "\n"
@@ -228,9 +243,9 @@ namespace CryptoDayTraderSuite.UI
             }
         }
 
-        private void RefreshSelectedAccountInsights()
+        private async Task RefreshSelectedAccountInsightsAsync(bool forceLiveValidation = false)
         {
-            if (lblCoinbaseInsightsSummary == null || _coinbaseReadOnlyImportService == null)
+            if (lblCoinbaseInsightsSummary == null)
             {
                 return;
             }
@@ -238,56 +253,179 @@ namespace CryptoDayTraderSuite.UI
             var selected = Selected();
             if (selected == null)
             {
-                lblCoinbaseInsightsSummary.Text = "Select an account to view Coinbase imported metrics.";
+                lblCoinbaseInsightsSummary.Text = "Select an account to view API/account insights.";
                 _holdingsBinding.DataSource = new List<HoldingViewRow>();
                 return;
             }
 
             var service = (selected.Service ?? string.Empty).Trim();
-            if (service.IndexOf("coinbase", StringComparison.OrdinalIgnoreCase) < 0)
+            var isCoinbase = service.IndexOf("coinbase", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            var summaryBuilder = new StringBuilder();
+
+            if (isCoinbase)
             {
-                lblCoinbaseInsightsSummary.Text = "Selected account is not Coinbase.";
-                _holdingsBinding.DataSource = new List<HoldingViewRow>();
-                return;
+                var snapshot = _coinbaseReadOnlyImportService == null ? null : _coinbaseReadOnlyImportService.GetLatestSnapshot(selected.KeyEntryId);
+                if (snapshot == null)
+                {
+                    summaryBuilder.AppendLine("No Coinbase snapshot found for this account yet. Use import or save the Coinbase key to auto-import.");
+                    _holdingsBinding.DataSource = new List<HoldingViewRow>();
+                }
+                else
+                {
+                    var quoteCurrency = string.IsNullOrWhiteSpace(snapshot.TotalBalanceQuoteCurrency)
+                        ? ResolveDefaultQuoteForDisplay(selected)
+                        : snapshot.TotalBalanceQuoteCurrency;
+                    var quoteLabel = ResolveQuoteDisplayLabel(quoteCurrency);
+                    var totalInQuote = snapshot.TotalBalanceInQuote != 0m ? snapshot.TotalBalanceInQuote : snapshot.TotalBalance;
+                    var importedAge = DateTime.UtcNow - snapshot.ImportedUtc;
+                    var isStale = importedAge.TotalHours >= SnapshotFreshnessHours;
+                    var freshnessText = isStale
+                        ? "STALE (" + ((int)Math.Floor(importedAge.TotalHours)).ToString() + "h old)"
+                        : "Fresh (" + ((int)Math.Floor(importedAge.TotalHours)).ToString() + "h old)";
+
+                    summaryBuilder.AppendLine("Imported Snapshot:");
+                    summaryBuilder.AppendLine("Account: " + (selected.Label ?? "(unnamed)"));
+                    summaryBuilder.AppendLine("Imported: " + snapshot.ImportedUtc.ToString("u"));
+                    summaryBuilder.AppendLine("Snapshot: " + freshnessText);
+                    summaryBuilder.AppendLine("Products: " + snapshot.ProductCount + " | Non-zero balances: " + snapshot.NonZeroBalanceCount);
+                    summaryBuilder.AppendLine("Total holdings (" + quoteLabel + "): " + FormatAmount(totalInQuote) + " | Excluded: " + snapshot.TotalBalanceExcludedCount);
+                    summaryBuilder.AppendLine("Fills: " + snapshot.TotalFillCount + " | New imports: " + snapshot.ImportedTradeCount);
+                    summaryBuilder.AppendLine("Fees paid: " + FormatAmount(snapshot.TotalFeesPaid) + " | Net profit est: " + FormatAmount(snapshot.NetProfitEstimate));
+                    summaryBuilder.Append("Maker: " + (snapshot.MakerRate * 100m).ToString("0.####") + "% | Taker: " + (snapshot.TakerRate * 100m).ToString("0.####") + "%");
+
+                    var holdings = snapshot.Holdings == null
+                        ? new List<HoldingViewRow>()
+                        : snapshot.Holdings
+                            .OrderByDescending(h => h.Amount)
+                            .Select(h => new HoldingViewRow { Currency = h.Currency, Amount = h.Amount })
+                            .ToList();
+                    _holdingsBinding.DataSource = holdings;
+                }
             }
 
-            var snapshot = _coinbaseReadOnlyImportService.GetLatestSnapshot(selected.KeyEntryId);
-            if (snapshot == null)
+            if (!isCoinbase)
             {
-                lblCoinbaseInsightsSummary.Text = "No Coinbase snapshot found for this account yet. Use import or save the Coinbase key to auto-import.";
                 _holdingsBinding.DataSource = new List<HoldingViewRow>();
-                return;
             }
 
-            var quoteCurrency = string.IsNullOrWhiteSpace(snapshot.TotalBalanceQuoteCurrency)
-                ? ResolveDefaultQuoteForDisplay(selected)
-                : snapshot.TotalBalanceQuoteCurrency;
-            var quoteLabel = ResolveQuoteDisplayLabel(quoteCurrency);
-            var totalInQuote = snapshot.TotalBalanceInQuote != 0m ? snapshot.TotalBalanceInQuote : snapshot.TotalBalance;
-            var importedAge = DateTime.UtcNow - snapshot.ImportedUtc;
-            var isStale = importedAge.TotalHours >= SnapshotFreshnessHours;
-            var freshnessText = isStale
-                ? "STALE (" + ((int)Math.Floor(importedAge.TotalHours)).ToString() + "h old)"
-                : "Fresh (" + ((int)Math.Floor(importedAge.TotalHours)).ToString() + "h old)";
+            var shouldRunLive = forceLiveValidation || !isCoinbase;
+            if (shouldRunLive)
+            {
+                if (summaryBuilder.Length > 0)
+                {
+                    summaryBuilder.AppendLine();
+                    summaryBuilder.AppendLine();
+                }
 
-            lblCoinbaseInsightsSummary.Text =
-                "Account: " + (selected.Label ?? "(unnamed)") + "\n"
-                + "Imported: " + snapshot.ImportedUtc.ToString("u") + "\n"
-                + "Snapshot: " + freshnessText + "\n"
-                + "Products: " + snapshot.ProductCount + " | Non-zero balances: " + snapshot.NonZeroBalanceCount + "\n"
-                + "Total holdings (" + quoteLabel + "): " + FormatAmount(totalInQuote)
-                + " | Excluded: " + snapshot.TotalBalanceExcludedCount + "\n"
-                + "Fills: " + snapshot.TotalFillCount + " | New imports: " + snapshot.ImportedTradeCount + "\n"
-                + "Fees paid: " + FormatAmount(snapshot.TotalFeesPaid) + " | Net profit est: " + FormatAmount(snapshot.NetProfitEstimate) + "\n"
-                + "Maker: " + (snapshot.MakerRate * 100m).ToString("0.####") + "% | Taker: " + (snapshot.TakerRate * 100m).ToString("0.####") + "%";
+                var liveSummary = await BuildLiveApiValidationSummaryAsync(selected).ConfigureAwait(true);
+                summaryBuilder.Append(liveSummary);
+            }
 
-            var holdings = snapshot.Holdings == null
-                ? new List<HoldingViewRow>()
-                : snapshot.Holdings
-                    .OrderByDescending(h => h.Amount)
-                    .Select(h => new HoldingViewRow { Currency = h.Currency, Amount = h.Amount })
-                    .ToList();
-            _holdingsBinding.DataSource = holdings;
+            lblCoinbaseInsightsSummary.Text = summaryBuilder.Length == 0
+                ? "No insights available for the selected account."
+                : summaryBuilder.ToString();
+        }
+
+        private async Task<string> BuildLiveApiValidationSummaryAsync(AccountProfile selected)
+        {
+            var lines = new List<string>();
+            var service = (selected == null ? string.Empty : (selected.Service ?? string.Empty)).Trim();
+            lines.Add("Live API Validation:");
+            lines.Add("Service: " + service);
+            lines.Add("Account: " + (selected == null ? "(none)" : (selected.Label ?? "(unnamed)")));
+
+            if (_exchangeProvider == null)
+            {
+                lines.Add("Validation unavailable: exchange provider is not initialized.");
+                return string.Join("\n", lines);
+            }
+
+            try
+            {
+                var client = _exchangeProvider.CreatePublicClient(service);
+                var products = await client.ListProductsAsync().ConfigureAwait(true);
+                var symbol = ResolveProbeSymbol(products, selected == null ? string.Empty : selected.DefaultQuote);
+                var ticker = await client.GetTickerAsync(symbol).ConfigureAwait(true);
+
+                lines.Add("Public API: PASS");
+                lines.Add("Products: " + (products == null ? 0 : products.Count));
+                lines.Add("Probe Symbol: " + symbol + " | Last: " + (ticker == null ? "0" : ticker.Last.ToString("0.########")));
+            }
+            catch (Exception ex)
+            {
+                lines.Add("Public API: FAIL - " + ex.Message);
+            }
+
+            try
+            {
+                var authClient = _exchangeProvider.CreateAuthenticatedClient(service);
+                var fees = await authClient.GetFeesAsync().ConfigureAwait(true);
+                lines.Add("Private API Auth: PASS");
+                lines.Add("Fees: Maker " + ((fees == null ? 0m : fees.MakerRate) * 100m).ToString("0.####") + "% | Taker " + ((fees == null ? 0m : fees.TakerRate) * 100m).ToString("0.####") + "%");
+            }
+            catch (Exception ex)
+            {
+                lines.Add("Private API Auth: FAIL - " + ex.Message);
+            }
+
+            try
+            {
+                if (_accountBuyingPowerService == null)
+                {
+                    lines.Add("Buying Power: unavailable (service not initialized)");
+                }
+                else
+                {
+                    var account = selected == null ? null : (AccountInfo)selected;
+                    var buyingPower = await _accountBuyingPowerService.ResolveAsync(account, 0m).ConfigureAwait(true);
+                    if (buyingPower.UsedLiveBalance)
+                    {
+                        lines.Add("Buying Power: " + buyingPower.EquityToUse.ToString("0.########") + " " + (buyingPower.QuoteCurrency ?? "USD") + " (live)");
+                    }
+                    else
+                    {
+                        lines.Add("Buying Power: not available from live balances (" + (buyingPower.Note ?? "unknown") + ")");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                lines.Add("Buying Power: FAIL - " + ex.Message);
+            }
+
+            lines.Add("Validated UTC: " + DateTime.UtcNow.ToString("u"));
+            return string.Join("\n", lines);
+        }
+
+        private string ResolveProbeSymbol(List<string> products, string preferredQuote)
+        {
+            if (products == null || products.Count == 0)
+            {
+                return "BTC-USD";
+            }
+
+            var quote = string.IsNullOrWhiteSpace(preferredQuote) ? "USD" : preferredQuote.Trim().ToUpperInvariant();
+            for (int i = 0; i < products.Count; i++)
+            {
+                var symbol = products[i] ?? string.Empty;
+                var upper = symbol.ToUpperInvariant();
+                if (upper.EndsWith("/" + quote) || upper.EndsWith("-" + quote))
+                {
+                    return symbol;
+                }
+            }
+
+            for (int i = 0; i < products.Count; i++)
+            {
+                var symbol = products[i] ?? string.Empty;
+                if (symbol.ToUpperInvariant().EndsWith("/USD") || symbol.ToUpperInvariant().EndsWith("-USD"))
+                {
+                    return symbol;
+                }
+            }
+
+            return products[0];
         }
 
         private string ResolveDefaultQuoteForDisplay(AccountProfile selected)

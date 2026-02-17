@@ -35,6 +35,7 @@ namespace CryptoDayTraderSuite.UI
             this.btnDelete = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnRefreshInsights = new System.Windows.Forms.Button();
             this.btnImportCoinbase = new System.Windows.Forms.Button();
             this.gridAccounts = new System.Windows.Forms.DataGridView();
             this.pnlCoinbaseInsights = new System.Windows.Forms.TableLayoutPanel();
@@ -80,6 +81,7 @@ namespace CryptoDayTraderSuite.UI
             this.topPanel.Controls.Add(this.btnDelete);
             this.topPanel.Controls.Add(this.btnSave);
             this.topPanel.Controls.Add(this.btnRefresh);
+            this.topPanel.Controls.Add(this.btnRefreshInsights);
             this.topPanel.Controls.Add(this.btnImportCoinbase);
             this.topPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.topPanel.Location = new System.Drawing.Point(3, 3);
@@ -132,12 +134,21 @@ namespace CryptoDayTraderSuite.UI
             this.btnRefresh.Text = "Refresh";
             this.btnRefresh.UseVisualStyleBackColor = true;
             // 
+            // btnRefreshInsights
+            // 
+            this.btnRefreshInsights.Location = new System.Drawing.Point(408, 3);
+            this.btnRefreshInsights.Name = "btnRefreshInsights";
+            this.btnRefreshInsights.Size = new System.Drawing.Size(130, 23);
+            this.btnRefreshInsights.TabIndex = 5;
+            this.btnRefreshInsights.Text = "Refresh Insights";
+            this.btnRefreshInsights.UseVisualStyleBackColor = true;
+            // 
             // btnImportCoinbase
             // 
-            this.btnImportCoinbase.Location = new System.Drawing.Point(408, 3);
+            this.btnImportCoinbase.Location = new System.Drawing.Point(544, 3);
             this.btnImportCoinbase.Name = "btnImportCoinbase";
             this.btnImportCoinbase.Size = new System.Drawing.Size(160, 23);
-            this.btnImportCoinbase.TabIndex = 5;
+            this.btnImportCoinbase.TabIndex = 6;
             this.btnImportCoinbase.Text = "Import Coinbase (Read-only)";
             this.btnImportCoinbase.UseVisualStyleBackColor = true;
             // 
@@ -186,9 +197,9 @@ namespace CryptoDayTraderSuite.UI
             this.lblCoinbaseInsightsTitle.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.lblCoinbaseInsightsTitle.Location = new System.Drawing.Point(3, 0);
             this.lblCoinbaseInsightsTitle.Name = "lblCoinbaseInsightsTitle";
-            this.lblCoinbaseInsightsTitle.Size = new System.Drawing.Size(169, 15);
+            this.lblCoinbaseInsightsTitle.Size = new System.Drawing.Size(181, 15);
             this.lblCoinbaseInsightsTitle.TabIndex = 0;
-            this.lblCoinbaseInsightsTitle.Text = "Coinbase Insights (By Account)";
+            this.lblCoinbaseInsightsTitle.Text = "Account API Insights (Selected)";
             // 
             // lblCoinbaseInsightsSummary
             // 
@@ -198,7 +209,7 @@ namespace CryptoDayTraderSuite.UI
             this.lblCoinbaseInsightsSummary.Name = "lblCoinbaseInsightsSummary";
             this.lblCoinbaseInsightsSummary.Size = new System.Drawing.Size(628, 96);
             this.lblCoinbaseInsightsSummary.TabIndex = 1;
-            this.lblCoinbaseInsightsSummary.Text = "Select an account to view Coinbase imported metrics.";
+            this.lblCoinbaseInsightsSummary.Text = "Select an account to view API/account insights.";
             // 
             // gridHoldings
             // 
@@ -298,6 +309,7 @@ namespace CryptoDayTraderSuite.UI
         public System.Windows.Forms.Button btnDelete;
         public System.Windows.Forms.Button btnSave;
         public System.Windows.Forms.Button btnRefresh;
+        public System.Windows.Forms.Button btnRefreshInsights;
         public System.Windows.Forms.Button btnImportCoinbase;
         public System.Windows.Forms.DataGridView gridAccounts;
         private System.Windows.Forms.TableLayoutPanel pnlCoinbaseInsights;

@@ -129,6 +129,21 @@ function Get-RecentLogs {
         Select-Object -First $MaxCount)
 }
 
+function Get-RecentCycleReports {
+    param(
+        [string]$ReportsDir,
+        [int]$MaxCount = 20
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ReportsDir) -or -not (Test-Path $ReportsDir)) {
+        return @()
+    }
+
+    return @(Get-ChildItem -Path $ReportsDir -Filter "cycle_*.json" -File |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First $MaxCount)
+}
+
 function Get-BestMatrixCycleReport {
     param([string]$ReportsDir)
 
@@ -395,15 +410,210 @@ function Merge-RejectCountsAcrossLogs {
     }
 }
 
+function Merge-RejectCountsAcrossCycleReports {
+    param(
+        [string]$ReportsDir,
+        [int]$MaxReports = 20
+    )
+
+    $categories = @("fees-kill", "slippage-kill", "routing-unavailable", "no-signal", "ai-veto", "bias-blocked")
+    $counts = @{}
+    foreach ($category in $categories) {
+        $counts[$category] = 0
+    }
+
+    $reports = Get-RecentCycleReports -ReportsDir $ReportsDir -MaxCount $MaxReports
+    $evidenceCycle = ""
+
+    foreach ($report in $reports) {
+        if ($null -eq $report) { continue }
+
+        $data = Try-ReadJson -Path $report.FullName
+        if ($null -eq $data) { continue }
+
+        $local = Merge-RejectCountsFromCycleReport -Current $counts -CycleReport $data
+        $counts = $local.Counts
+
+        $localHit = $false
+        foreach ($category in $categories) {
+            if ($counts[$category] -gt 0) {
+                $localHit = $true
+                break
+            }
+        }
+
+        if ($localHit -and [string]::IsNullOrWhiteSpace($evidenceCycle)) {
+            $evidenceCycle = $report.Name
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($evidenceCycle) -and $reports.Count -gt 0) {
+        $evidenceCycle = $reports[0].Name
+    }
+
+    return [pscustomobject]@{
+        Counts = $counts
+        EvidenceCycleName = $evidenceCycle
+        ScannedReports = $reports.Count
+    }
+}
+
+function Get-RejectEvidenceWaiverContext {
+    param(
+        [string]$ReportsDir,
+        [int]$MaxAgeHours
+    )
+
+    $latestCycle = Get-LatestCycleReport -ReportsDir $ReportsDir
+    if ($null -eq $latestCycle) {
+        return [pscustomobject]@{ Waivable = $false; Detail = "no-cycle" }
+    }
+
+    $ageHours = Get-AgeHours -UtcTimestamp $latestCycle.LastWriteTimeUtc
+    if ($ageHours -gt $MaxAgeHours) {
+        return [pscustomobject]@{ Waivable = $false; Detail = "stale-cycle age=" + $ageHours.ToString("0.##") + "h" }
+    }
+
+    $cycleData = Try-ReadJson -Path $latestCycle.FullName
+    if ($null -eq $cycleData) {
+        return [pscustomobject]@{ Waivable = $false; Detail = "unreadable-cycle" }
+    }
+
+    $profiles = @($cycleData.Profiles)
+    if ($profiles.Count -eq 0) {
+        return [pscustomobject]@{ Waivable = $false; Detail = "no-profiles" }
+    }
+
+    $executed = @($profiles | Where-Object { [string]::Equals([string]$_.Status, "executed", [System.StringComparison]::OrdinalIgnoreCase) })
+    if ($executed.Count -gt 0) {
+        return [pscustomobject]@{ Waivable = $false; Detail = "executed=" + $executed.Count }
+    }
+
+    $allowedReasons = @("interval", "account", "pairs")
+    $unsupported = @($profiles | Where-Object {
+        $status = [string]$_.Status
+        $reason = [string]$_.Reason
+        if (-not [string]::Equals($status, "skipped", [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
+        if ([string]::IsNullOrWhiteSpace($reason)) { return $true }
+        return -not ($allowedReasons -contains $reason.ToLowerInvariant())
+    })
+
+    if ($unsupported.Count -gt 0) {
+        return [pscustomobject]@{ Waivable = $false; Detail = "unsupported-skip-reason" }
+    }
+
+    $reasons = @($profiles | ForEach-Object { [string]$_.Reason } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.ToLowerInvariant() } | Select-Object -Unique)
+    return [pscustomobject]@{ Waivable = $true; Detail = "cycle=" + $latestCycle.Name + ",reasons=" + ($reasons -join ",") + ",profiles=" + $profiles.Count }
+}
+
+function Test-IsUsableProviderProbeReport {
+    param(
+        [object]$ProbeReport,
+        [string[]]$RequiredServices
+    )
+
+    if ($null -eq $ProbeReport) {
+        return $false
+    }
+
+    $rows = @($ProbeReport.Results)
+    if ($rows.Count -eq 0) {
+        return $false
+    }
+
+    $required = @($RequiredServices | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
+    if ($required.Count -eq 0) {
+        return $true
+    }
+
+    foreach ($svc in $required) {
+        $match = Find-ProviderProbeRow -Rows $rows -Service $svc
+        if ($null -ne $match) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Normalize-ProviderServiceName {
+    param([string]$Service)
+
+    if ([string]::IsNullOrWhiteSpace($Service)) {
+        return ""
+    }
+
+    $value = $Service.Trim().ToLowerInvariant()
+    switch ($value) {
+        "coinbase" { return "Coinbase" }
+        "coinbase advanced" { return "Coinbase" }
+        "coinbase-advanced" { return "Coinbase" }
+        "coinbase-exchange" { return "Coinbase" }
+
+        "binance" { return "Binance" }
+        "binance-us" { return "Binance" }
+        "binance-global" { return "Binance" }
+
+        "bybit" { return "Bybit" }
+        "bybit-global" { return "Bybit" }
+
+        "okx" { return "OKX" }
+        "okx-global" { return "OKX" }
+
+        "kraken" { return "Kraken" }
+        "bitstamp" { return "Bitstamp" }
+        default { return $Service.Trim() }
+    }
+}
+
+function Find-ProviderProbeRow {
+    param(
+        [object[]]$Rows,
+        [string]$Service
+    )
+
+    $target = Normalize-ProviderServiceName -Service $Service
+    if ([string]::IsNullOrWhiteSpace($target)) {
+        return $null
+    }
+
+    foreach ($row in @($Rows)) {
+        if ($null -eq $row) { continue }
+        $rowService = Normalize-ProviderServiceName -Service ([string]($row | Select-Object -ExpandProperty Service -ErrorAction SilentlyContinue))
+        if ([string]::Equals($rowService, $target, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $row
+        }
+    }
+
+    return $null
+}
+
 function Get-LatestProviderProbeReport {
-    param([string]$RepoRootPath)
+    param(
+        [string]$RepoRootPath,
+        [string[]]$RequiredServices = @()
+    )
 
     $providerDir = Join-Path $RepoRootPath "obj\runtime_reports\provider_audit"
     if (-not (Test-Path $providerDir)) { return $null }
 
-    return Get-ChildItem -Path $providerDir -Filter "provider_public_api_probe_*.json" -File |
+    $candidates = @(Get-ChildItem -Path $providerDir -Filter "provider_public_api_probe_*.json" -File |
         Sort-Object LastWriteTimeUtc -Descending |
-        Select-Object -First 1
+        Select-Object -First 50)
+
+    foreach ($candidate in $candidates) {
+        if ($null -eq $candidate) { continue }
+        $data = Try-ReadJson -Path $candidate.FullName
+        if (Test-IsUsableProviderProbeReport -ProbeReport $data -RequiredServices $RequiredServices) {
+            return $candidate
+        }
+    }
+
+    if ($candidates.Count -gt 0) {
+        return $candidates[0]
+    }
+
+    return $null
 }
 
 function Test-IsEnvironmentConstraintError {
@@ -430,6 +640,40 @@ function Test-IsEnvironmentConstraintError {
     }
 
     return $false
+}
+
+function Test-IsWaivableProviderConstraintRow {
+    param([object]$Row)
+
+    if ($null -eq $Row) {
+        return $false
+    }
+
+    $service = [string]$Row.Service
+    if (-not [string]::Equals($service, "Bybit", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    $failureClass = [string]($Row | Select-Object -ExpandProperty FailureClass -ErrorAction SilentlyContinue)
+    if (-not [string]::Equals($failureClass, "INTEGRATION-ERROR", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    $errorText = [string]($Row | Select-Object -ExpandProperty Error -ErrorAction SilentlyContinue)
+    $productCount = [int]($Row | Select-Object -ExpandProperty ProductCount -ErrorAction SilentlyContinue)
+    $spotCoverage = [bool]($Row | Select-Object -ExpandProperty SpotCoverage -ErrorAction SilentlyContinue)
+    $perpCoverage = [bool]($Row | Select-Object -ExpandProperty PerpCoverage -ErrorAction SilentlyContinue)
+
+    $looksLikeNoProductsConstraint = ($productCount -le 0) -and (-not $spotCoverage) -and (-not $perpCoverage)
+    if (-not $looksLikeNoProductsConstraint) {
+        return $false
+    }
+
+    if ([string]::IsNullOrWhiteSpace($errorText)) {
+        return $true
+    }
+
+    return ($errorText -match "no products") -or ($errorText -match "returned no products")
 }
 
 function Evaluate-ProviderProbeStatus {
@@ -465,7 +709,7 @@ function Evaluate-ProviderProbeStatus {
     $constraintFailures = @()
 
     foreach ($svc in $required) {
-        $row = $rows | Where-Object { [string]::Equals([string]$_.Service, $svc, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+        $row = Find-ProviderProbeRow -Rows $rows -Service $svc
         if ($null -eq $row) {
             $missing += $svc
             continue
@@ -490,6 +734,11 @@ function Evaluate-ProviderProbeStatus {
         if (-not [string]::IsNullOrWhiteSpace($failureClass)) {
             if ([string]::Equals($failureClass, "ENV-CONSTRAINT", [System.StringComparison]::OrdinalIgnoreCase)) {
                 $constraintFailures += ($serviceName + "(ENV-CONSTRAINT)")
+                continue
+            }
+
+            if (Test-IsWaivableProviderConstraintRow -Row $row) {
+                $constraintFailures += ($serviceName + "(ENV-CONSTRAINT:NO-PRODUCTS)")
                 continue
             }
 
@@ -586,7 +835,7 @@ function Evaluate-SpotPerpCoverageStatus {
 
     foreach ($svc in @($RequiredServices)) {
         if ([string]::IsNullOrWhiteSpace($svc)) { continue }
-        $row = $rows | Where-Object { [string]::Equals([string]$_.Service, $svc, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+        $row = Find-ProviderProbeRow -Rows $rows -Service $svc
         if ($null -eq $row) {
             $missingSpot += $svc
             continue
@@ -598,6 +847,11 @@ function Evaluate-SpotPerpCoverageStatus {
             continue
         }
 
+        if (Test-IsWaivableProviderConstraintRow -Row $row) {
+            $waivedSpot += ($svc + "(no-products)")
+            continue
+        }
+
         if (-not [bool]$row.SpotCoverage) {
             $missingSpot += $svc
         }
@@ -605,7 +859,7 @@ function Evaluate-SpotPerpCoverageStatus {
 
     foreach ($svc in @($RequiredPerpServices)) {
         if ([string]::IsNullOrWhiteSpace($svc)) { continue }
-        $row = $rows | Where-Object { [string]::Equals([string]$_.Service, $svc, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+        $row = Find-ProviderProbeRow -Rows $rows -Service $svc
         if ($null -eq $row) {
             $missingPerp += $svc
             continue
@@ -614,6 +868,11 @@ function Evaluate-SpotPerpCoverageStatus {
         $failureClass = [string]($row | Select-Object -ExpandProperty FailureClass -ErrorAction SilentlyContinue)
         if ([string]::Equals($failureClass, "ENV-CONSTRAINT", [System.StringComparison]::OrdinalIgnoreCase)) {
             $waivedPerp += $svc
+            continue
+        }
+
+        if (Test-IsWaivableProviderConstraintRow -Row $row) {
+            $waivedPerp += ($svc + "(no-products)")
             continue
         }
 
@@ -938,7 +1197,7 @@ function Emit-PolicyBackedStrategyExchangeEvidence {
         return $null
     }
 
-    $providerArtifact = Get-LatestProviderProbeReport -RepoRootPath $RepoRootPath
+    $providerArtifact = Get-LatestProviderProbeReport -RepoRootPath $RepoRootPath -RequiredServices @("Coinbase", "Binance", "Bybit", "OKX", "Kraken")
     $providerJson = if ($null -ne $providerArtifact) { Try-ReadJson -Path $providerArtifact.FullName } else { $null }
     $providerRows = @()
     if ($null -ne $providerJson) {
@@ -961,7 +1220,7 @@ function Emit-PolicyBackedStrategyExchangeEvidence {
             if ([string]::IsNullOrWhiteSpace($exchange)) { continue }
 
             $policyVenue = Convert-ToPolicyVenue -Exchange $exchange
-            $providerRow = $providerRows | Where-Object { [string]::Equals([string]$_.Service, $policyVenue, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+            $providerRow = Find-ProviderProbeRow -Rows $providerRows -Service $policyVenue
             $statusResult = Get-PolicyBackedRowStatus -Strategy $strategy -Exchange $exchange -PolicyAllowLookup $policyAllowLookup -ProviderRow $providerRow -ProviderArtifactName $providerArtifactName
 
             $rows.Add([pscustomobject]@{
@@ -1144,14 +1403,31 @@ try {
 
     $buildOutput = ""
     $buildExit = 1
-    $verifyOutDir = "bin\\Debug_Verify\\"
-    try {
-        $buildOutput = & msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=$verifyOutDir /t:Build /v:minimal 2>&1 | Out-String
-        $buildExit = $LASTEXITCODE
-    }
-    catch {
-        $buildOutput = $_.Exception.Message
-        $buildExit = 1
+    $verifyOutDir = ""
+    $buildAttempts = 0
+    $buildMaxAttempts = 2
+    while ($buildAttempts -lt $buildMaxAttempts -and $buildExit -ne 0) {
+        $buildAttempts++
+        $verifyOutDir = ("bin\\Debug_Verify\\cert_{0}_{1}\\" -f $stamp, $buildAttempts)
+        try {
+            $buildOutput = & msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=$verifyOutDir /t:Build /v:minimal 2>&1 | Out-String
+            $buildExit = $LASTEXITCODE
+        }
+        catch {
+            $buildOutput = $_.Exception.Message
+            $buildExit = 1
+        }
+
+        if ($buildExit -eq 0) {
+            break
+        }
+
+        $lockDetected = -not [string]::IsNullOrWhiteSpace($buildOutput) -and ($buildOutput -match "being used by another process")
+        if (-not $lockDetected -or $buildAttempts -ge $buildMaxAttempts) {
+            break
+        }
+
+        Start-Sleep -Seconds 2
     }
 
     if ($buildExit -eq 0) {
@@ -1225,7 +1501,7 @@ try {
     $requiredServices = @("Coinbase", "Binance", "Bybit", "OKX", "Kraken")
     $requiredPerpServices = @("Coinbase", "Binance", "Bybit")
 
-    $providerReportFile = Get-LatestProviderProbeReport -RepoRootPath $repo
+    $providerReportFile = Get-LatestProviderProbeReport -RepoRootPath $repo -RequiredServices $requiredServices
     $providerReport = if ($null -ne $providerReportFile) { Try-ReadJson -Path $providerReportFile.FullName } else { $null }
     $providerEval = Evaluate-ProviderProbeStatus -ProbeReport $providerReport -RequiredServices $requiredServices
 
@@ -1292,28 +1568,70 @@ try {
     }
 
     $recentLogMerge = Merge-RejectCountsAcrossLogs -LogsDir $LogRoot -MaxLogs 20
+    $recentCycleMerge = Merge-RejectCountsAcrossCycleReports -ReportsDir $AutoModeReportsDir -MaxReports 20
     $rejectCounts = $recentLogMerge.Counts
+    foreach ($rejectCategory in @("fees-kill", "slippage-kill", "routing-unavailable", "no-signal", "ai-veto", "bias-blocked")) {
+        $cycleValue = if ($recentCycleMerge.Counts.ContainsKey($rejectCategory)) { [int]$recentCycleMerge.Counts[$rejectCategory] } else { 0 }
+        if ($cycleValue -gt $rejectCounts[$rejectCategory]) {
+            $rejectCounts[$rejectCategory] = $cycleValue
+        }
+    }
     $cycleRejectMerge = Merge-RejectCountsFromCycleReport -Current $rejectCounts -CycleReport $cycleData
     $rejectCounts = $cycleRejectMerge.Counts
     $rejectObserved = ($rejectCounts.Keys | Where-Object { $rejectCounts[$_] -gt 0 }).Count -gt 0
     $rejectEvidenceLog = [string]$recentLogMerge.EvidenceLogName
+    $rejectEvidenceCycle = [string]$recentCycleMerge.EvidenceCycleName
+    $rejectWaiver = Get-RejectEvidenceWaiverContext -ReportsDir $AutoModeReportsDir -MaxAgeHours $MaxRejectEvidenceAgeHours
     if ([string]::IsNullOrWhiteSpace($rejectEvidenceLog) -and $null -ne $latestLog) {
         $rejectEvidenceLog = $latestLog.Name
     }
 
-    if ($null -eq $latestLog) {
-        Add-CheckResult -List $checks -Result (New-CheckResult -Name "Reject category evidence" -Status "PARTIAL" -Detail "No runtime log found for reject-category extraction.")
+    if ($null -eq $latestLog -and [string]::IsNullOrWhiteSpace($rejectEvidenceCycle)) {
+        Add-CheckResult -List $checks -Result (New-CheckResult -Name "Reject category evidence" -Status "PARTIAL" -Detail "No runtime log or cycle report found for reject-category extraction.")
     }
     elseif ($rejectObserved) {
-        $rejectSourceText = "Source=" + $rejectEvidenceLog
+        $sourceParts = New-Object System.Collections.Generic.List[string]
+        if (-not [string]::IsNullOrWhiteSpace($rejectEvidenceLog)) {
+            $sourceParts.Add("log=" + $rejectEvidenceLog) | Out-Null
+        }
+        if (-not [string]::IsNullOrWhiteSpace($rejectEvidenceCycle)) {
+            $sourceParts.Add("cycle=" + $rejectEvidenceCycle) | Out-Null
+        }
+        if ($sourceParts.Count -eq 0) {
+            $sourceParts.Add("none") | Out-Null
+        }
+        $rejectSourceText = "Source=" + ($sourceParts -join ";")
         if ($cycleRejectMerge.Applied) {
             $rejectSourceText += " + cycle"
         }
         Add-CheckResult -List $checks -Result (New-CheckResult -Name "Reject category evidence" -Status "PASS" -Detail ($rejectSourceText + ", observed=" + (($rejectCounts.Keys | Where-Object { $rejectCounts[$_] -gt 0 }) -join ", ")))
     }
+    elseif ($strictGateReject -and $rejectWaiver.Waivable) {
+        $sourceParts = New-Object System.Collections.Generic.List[string]
+        if (-not [string]::IsNullOrWhiteSpace($rejectEvidenceLog)) {
+            $sourceParts.Add("log=" + $rejectEvidenceLog) | Out-Null
+        }
+        if (-not [string]::IsNullOrWhiteSpace($rejectEvidenceCycle)) {
+            $sourceParts.Add("cycle=" + $rejectEvidenceCycle) | Out-Null
+        }
+        if ($sourceParts.Count -eq 0) {
+            $sourceParts.Add("none") | Out-Null
+        }
+        Add-CheckResult -List $checks -Result (New-CheckResult -Name "Reject category evidence" -Status "PARTIAL" -Detail ("Source=" + ($sourceParts -join ";") + ", no tracked reject categories found; waived as non-observable runtime window (" + [string]$rejectWaiver.Detail + ")."))
+    }
     else {
         $status = if ($strictGateReject) { "FAIL" } else { "PARTIAL" }
-        Add-CheckResult -List $checks -Result (New-CheckResult -Name "Reject category evidence" -Status $status -Detail ("Source=" + $rejectEvidenceLog + ", no tracked reject categories found."))
+        $sourceParts = New-Object System.Collections.Generic.List[string]
+        if (-not [string]::IsNullOrWhiteSpace($rejectEvidenceLog)) {
+            $sourceParts.Add("log=" + $rejectEvidenceLog) | Out-Null
+        }
+        if (-not [string]::IsNullOrWhiteSpace($rejectEvidenceCycle)) {
+            $sourceParts.Add("cycle=" + $rejectEvidenceCycle) | Out-Null
+        }
+        if ($sourceParts.Count -eq 0) {
+            $sourceParts.Add("none") | Out-Null
+        }
+        Add-CheckResult -List $checks -Result (New-CheckResult -Name "Reject category evidence" -Status $status -Detail ("Source=" + ($sourceParts -join ";") + ", no tracked reject categories found."))
     }
 
     if ($null -ne $latestLog) {

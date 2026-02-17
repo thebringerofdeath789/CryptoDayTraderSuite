@@ -92,7 +92,7 @@ namespace CryptoDayTraderSuite.Services
                         EquityToUse = value,
                         UsedLiveBalance = true,
                         QuoteCurrency = quote,
-                        Source = NormalizeService(account.Service),
+                        Source = ExchangeServiceNameNormalizer.NormalizeFamilyKey(account.Service, "coinbase"),
                         Note = "live quote balance"
                     };
                     Cache(cacheKey, live);
@@ -100,7 +100,7 @@ namespace CryptoDayTraderSuite.Services
                 }
 
                 var missing = ManualFallback(manualFallback, "quote balance unavailable");
-                missing.Source = NormalizeService(account.Service);
+                missing.Source = ExchangeServiceNameNormalizer.NormalizeFamilyKey(account.Service, "coinbase");
                 missing.QuoteCurrency = quoteCandidates.FirstOrDefault() ?? "USD";
                 Cache(cacheKey, missing);
                 return missing;
@@ -108,7 +108,7 @@ namespace CryptoDayTraderSuite.Services
             catch (Exception ex)
             {
                 var fallback = ManualFallback(manualFallback, "balance lookup failed: " + ex.Message);
-                fallback.Source = NormalizeService(account.Service);
+                fallback.Source = ExchangeServiceNameNormalizer.NormalizeFamilyKey(account.Service, "coinbase");
                 Cache(cacheKey, fallback);
                 return fallback;
             }
@@ -160,7 +160,7 @@ namespace CryptoDayTraderSuite.Services
         {
             return (account.Id ?? string.Empty) + "|"
                 + (account.KeyEntryId ?? string.Empty) + "|"
-                + NormalizeService(account.Service) + "|"
+                + ExchangeServiceNameNormalizer.NormalizeFamilyKey(account.Service, "coinbase") + "|"
                 + (account.DefaultQuote ?? string.Empty);
         }
 
@@ -178,11 +178,13 @@ namespace CryptoDayTraderSuite.Services
 
         private async Task<Dictionary<string, decimal>> GetBalancesAsync(AccountInfo account, KeyInfo key)
         {
-            var service = NormalizeService(account.Service);
+            var service = ExchangeServiceNameNormalizer.NormalizeFamilyKey(account.Service, "coinbase");
             switch (service)
             {
                 case "coinbase":
                     return await GetCoinbaseBalancesAsync(key).ConfigureAwait(false);
+                case "binance":
+                    return await GetBinanceBalancesAsync(account, key).ConfigureAwait(false);
                 case "kraken":
                     return await GetKrakenBalancesAsync(key).ConfigureAwait(false);
                 case "bitstamp":
@@ -205,7 +207,21 @@ namespace CryptoDayTraderSuite.Services
             var pem = SafeUnprotect(key.ECPrivateKeyPem);
 
             CoinbaseCredentialNormalizer.NormalizeCoinbaseAdvancedInputs(ref apiKey, ref apiSecret, ref keyName, ref pem);
-            var client = new CoinbaseExchangeClient(keyName, pem, passphrase);
+            var inner = new CoinbaseExchangeClient(keyName, pem, passphrase);
+            var client = new ResilientExchangeClient(inner, serviceKey: "coinbase");
+            return await client.GetBalancesAsync().ConfigureAwait(false);
+        }
+
+        private async Task<Dictionary<string, decimal>> GetBinanceBalancesAsync(AccountInfo account, KeyInfo key)
+        {
+            var apiKey = SafeUnprotect(key.ApiKey);
+            var apiSecret = SafeUnprotect(!string.IsNullOrWhiteSpace(key.ApiSecretBase64) ? key.ApiSecretBase64 : key.Secret);
+            var isGlobal = ExchangeServiceNameNormalizer.IsBinanceGlobalAlias(account == null ? string.Empty : account.Service);
+            var restBaseUrl = isGlobal
+                ? "https://api.binance.com"
+                : "https://api.binance.us";
+            var inner = new BinanceClient(apiKey, apiSecret, restBaseUrl);
+            var client = new ResilientExchangeClient(inner, serviceKey: isGlobal ? "binance-global" : "binance-us");
             return await client.GetBalancesAsync().ConfigureAwait(false);
         }
 
@@ -213,7 +229,8 @@ namespace CryptoDayTraderSuite.Services
         {
             var apiKey = SafeUnprotect(key.ApiKey);
             var apiSecret = SafeUnprotect(!string.IsNullOrWhiteSpace(key.ApiSecretBase64) ? key.ApiSecretBase64 : key.Secret);
-            var client = new KrakenClient(apiKey, apiSecret);
+            var inner = new KrakenClient(apiKey, apiSecret);
+            var client = new ResilientExchangeClient(inner, serviceKey: "kraken");
             return await client.GetBalancesAsync().ConfigureAwait(false);
         }
 
@@ -222,7 +239,8 @@ namespace CryptoDayTraderSuite.Services
             var apiKey = SafeUnprotect(key.ApiKey);
             var apiSecret = SafeUnprotect(!string.IsNullOrWhiteSpace(key.ApiSecretBase64) ? key.ApiSecretBase64 : key.Secret);
             var customerId = SafeUnprotect(key.Passphrase);
-            var client = new BitstampClient(apiKey, apiSecret, customerId);
+            var inner = new BitstampClient(apiKey, apiSecret, customerId);
+            var client = new ResilientExchangeClient(inner, serviceKey: "bitstamp");
             return await client.GetBalancesAsync().ConfigureAwait(false);
         }
 
@@ -230,11 +248,12 @@ namespace CryptoDayTraderSuite.Services
         {
             var apiKey = SafeUnprotect(key.ApiKey);
             var apiSecret = SafeUnprotect(!string.IsNullOrWhiteSpace(key.ApiSecretBase64) ? key.ApiSecretBase64 : key.Secret);
-            var rawService = (account == null ? string.Empty : (account.Service ?? string.Empty)).Trim().ToLowerInvariant();
-            var restBaseUrl = rawService == "bybit-global" || rawService == "bybit_global" || rawService == "bybit global"
+            var isGlobal = ExchangeServiceNameNormalizer.IsBybitGlobalAlias(account == null ? string.Empty : account.Service);
+            var restBaseUrl = isGlobal
                 ? "https://api.bybit.com"
                 : null;
-            var client = new BybitClient(apiKey, apiSecret, restBaseUrl);
+            var inner = new BybitClient(apiKey, apiSecret, restBaseUrl);
+            var client = new ResilientExchangeClient(inner, serviceKey: isGlobal ? "bybit-global" : "bybit");
             return await client.GetBalancesAsync().ConfigureAwait(false);
         }
 
@@ -243,11 +262,12 @@ namespace CryptoDayTraderSuite.Services
             var apiKey = SafeUnprotect(key.ApiKey);
             var apiSecret = SafeUnprotect(!string.IsNullOrWhiteSpace(key.ApiSecretBase64) ? key.ApiSecretBase64 : key.Secret);
             var passphrase = SafeUnprotect(key.Passphrase);
-            var rawService = (account == null ? string.Empty : (account.Service ?? string.Empty)).Trim().ToLowerInvariant();
-            var restBaseUrl = rawService == "okx-global" || rawService == "okx_global" || rawService == "okx global"
+            var isGlobal = ExchangeServiceNameNormalizer.IsOkxGlobalAlias(account == null ? string.Empty : account.Service);
+            var restBaseUrl = isGlobal
                 ? "https://www.okx.com"
                 : null;
-            var client = new OkxClient(apiKey, apiSecret, passphrase, restBaseUrl);
+            var inner = new OkxClient(apiKey, apiSecret, passphrase, restBaseUrl);
+            var client = new ResilientExchangeClient(inner, serviceKey: isGlobal ? "okx-global" : "okx");
             return await client.GetBalancesAsync().ConfigureAwait(false);
         }
 
@@ -279,37 +299,5 @@ namespace CryptoDayTraderSuite.Services
             return list;
         }
 
-        private static string NormalizeService(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value)) return "coinbase";
-            var normalized = value.Trim().ToLowerInvariant();
-
-            if (normalized == "coinbase" || normalized == "coinbase-advanced" || normalized == "coinbase_exchange" || normalized == "coinbase-exchange" || normalized == "coinbase advanced" || normalized == "coinbase exchange")
-            {
-                return "coinbase";
-            }
-
-            if (normalized == "kraken")
-            {
-                return "kraken";
-            }
-
-            if (normalized == "bitstamp")
-            {
-                return "bitstamp";
-            }
-
-            if (normalized == "bybit" || normalized == "bybit-global" || normalized == "bybit_global" || normalized == "bybit global")
-            {
-                return "bybit";
-            }
-
-            if (normalized == "okx" || normalized == "okx-global" || normalized == "okx_global" || normalized == "okx global")
-            {
-                return "okx";
-            }
-
-            return normalized;
-        }
     }
 }

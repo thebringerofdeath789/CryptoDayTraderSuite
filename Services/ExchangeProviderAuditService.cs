@@ -10,6 +10,8 @@ namespace CryptoDayTraderSuite.Services
     public sealed class ExchangeProviderAuditResult
     {
         public string Service { get; set; }
+        public string RequestedService { get; set; }
+        public string CanonicalService { get; set; }
         public bool PublicClientCreated { get; set; }
         public bool ProductDiscoverySucceeded { get; set; }
         public bool TickerSucceeded { get; set; }
@@ -42,10 +44,16 @@ namespace CryptoDayTraderSuite.Services
         {
             var list = services == null
                 ? new List<string>()
-                : services.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                : services.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList();
 
-            var results = new List<ExchangeProviderAuditResult>(list.Count);
-            foreach (var service in list)
+            var normalizedList = list
+                .Select(ExchangeServiceNameNormalizer.NormalizeAuditServiceName)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var results = new List<ExchangeProviderAuditResult>(normalizedList.Count);
+            foreach (var service in normalizedList)
             {
                 results.Add(await ValidateSingleServiceAsync(service, preferredSymbol).ConfigureAwait(false));
             }
@@ -55,10 +63,16 @@ namespace CryptoDayTraderSuite.Services
 
         private async Task<ExchangeProviderAuditResult> ValidateSingleServiceAsync(string service, string preferredSymbol)
         {
-            var result = new ExchangeProviderAuditResult { Service = service };
+            var canonicalService = ExchangeServiceNameNormalizer.NormalizeAuditServiceName(service);
+            var result = new ExchangeProviderAuditResult
+            {
+                Service = canonicalService,
+                RequestedService = service,
+                CanonicalService = canonicalService
+            };
             try
             {
-                var client = _exchangeProvider.CreatePublicClient(service);
+                var client = _exchangeProvider.CreatePublicClient(canonicalService);
                 result.PublicClientCreated = client != null;
                 if (client == null)
                 {
@@ -70,12 +84,14 @@ namespace CryptoDayTraderSuite.Services
                 var products = await client.ListProductsAsync().ConfigureAwait(false);
                 discoveryWatch.Stop();
 
-                result.ProductDiscoverySucceeded = products != null && products.Count > 0;
-                result.ProductCount = products != null ? products.Count : 0;
+                var normalizedProducts = SanitizeProducts(products);
+
+                result.ProductDiscoverySucceeded = normalizedProducts.Count > 0;
+                result.ProductCount = normalizedProducts.Count;
                 result.DiscoveryLatencyMs = discoveryWatch.ElapsedMilliseconds;
 
-                var spotCount = CountProducts(products, false);
-                var perpCount = CountProducts(products, true);
+                var spotCount = CountProducts(normalizedProducts, false);
+                var perpCount = CountProducts(normalizedProducts, true);
                 result.SpotProductCount = spotCount;
                 result.PerpProductCount = perpCount;
                 result.SpotCoverage = spotCount > 0;
@@ -87,7 +103,7 @@ namespace CryptoDayTraderSuite.Services
                     return result;
                 }
 
-                var symbol = ResolveProbeSymbol(products, preferredSymbol);
+                var symbol = ResolveProbeSymbol(normalizedProducts, preferredSymbol);
                 result.ProbeSymbol = symbol;
 
                 var tickerWatch = Stopwatch.StartNew();
@@ -95,20 +111,50 @@ namespace CryptoDayTraderSuite.Services
                 tickerWatch.Stop();
 
                 result.TickerLatencyMs = tickerWatch.ElapsedMilliseconds;
-                result.TickerSucceeded = ticker != null && ticker.Last > 0m;
+                result.TickerSucceeded = IsValidTicker(ticker);
 
                 if (!result.TickerSucceeded)
                 {
-                    result.Error = "GetTickerAsync returned empty/invalid ticker payload.";
+                    result.Error = "GetTickerAsync returned empty/invalid ticker payload (requires last>0 or bid/ask>0).";
                 }
 
                 return result;
             }
             catch (Exception ex)
             {
-                result.Error = ex.Message;
+                result.Error = NormalizeErrorMessage(ex);
                 return result;
             }
+        }
+
+        private static List<string> SanitizeProducts(IList<string> products)
+        {
+            var output = new List<string>();
+            if (products == null || products.Count == 0)
+            {
+                return output;
+            }
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < products.Count; i++)
+            {
+                var symbol = products[i];
+                if (string.IsNullOrWhiteSpace(symbol))
+                {
+                    continue;
+                }
+
+                var trimmed = symbol.Trim();
+                var normalizedKey = NormalizeProductForComparison(trimmed);
+                if (normalizedKey.Length == 0 || !seen.Add(normalizedKey))
+                {
+                    continue;
+                }
+
+                output.Add(trimmed);
+            }
+
+            return output;
         }
 
         private static int CountProducts(IList<string> products, bool perp)
@@ -134,6 +180,45 @@ namespace CryptoDayTraderSuite.Services
             return count;
         }
 
+        private static bool IsValidTicker(Models.Ticker ticker)
+        {
+            if (ticker == null)
+            {
+                return false;
+            }
+
+            if (ticker.Last > 0m)
+            {
+                return true;
+            }
+
+            var hasBid = ticker.Bid > 0m;
+            var hasAsk = ticker.Ask > 0m;
+            if (hasBid && hasAsk && ticker.Ask >= ticker.Bid)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string NormalizeErrorMessage(Exception ex)
+        {
+            var message = ex == null ? string.Empty : (ex.Message ?? string.Empty);
+            if (message.Length == 0)
+            {
+                return "Unknown provider audit error.";
+            }
+
+            message = message.Replace("\r", " ").Replace("\n", " ").Trim();
+            if (message.Length > 800)
+            {
+                message = message.Substring(0, 800);
+            }
+
+            return message;
+        }
+
         private static bool IsPerpProduct(string symbol)
         {
             var normalized = (symbol ?? string.Empty).Trim().ToUpperInvariant();
@@ -143,9 +228,14 @@ namespace CryptoDayTraderSuite.Services
             }
 
             return normalized.Contains("PERP")
+                || normalized.Contains("PERPETUAL")
                 || normalized.Contains("SWAP")
+                || normalized.Contains("USDTM")
                 || normalized.Contains("-PI_")
                 || normalized.Contains(":PERP")
+                || normalized.EndsWith("_PERP", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith("-PERP", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith(":SWAP", StringComparison.OrdinalIgnoreCase)
                 || normalized.EndsWith("USDTPERP", StringComparison.OrdinalIgnoreCase)
                 || normalized.EndsWith("USDT-PERP", StringComparison.OrdinalIgnoreCase)
                 || normalized.EndsWith("USDT:USDT", StringComparison.OrdinalIgnoreCase)
@@ -158,16 +248,99 @@ namespace CryptoDayTraderSuite.Services
 
             if (!string.IsNullOrWhiteSpace(preferredSymbol))
             {
+                var normalizedPreferred = NormalizeProductForComparison(preferredSymbol);
                 for (var i = 0; i < products.Count; i++)
                 {
                     if (string.Equals(products[i], preferredSymbol, StringComparison.OrdinalIgnoreCase))
                     {
                         return products[i];
                     }
+
+                    if (string.Equals(NormalizeProductForComparison(products[i]), normalizedPreferred, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return products[i];
+                    }
                 }
+            }
+
+            var bestSpotSymbol = string.Empty;
+            var bestSpotScore = int.MinValue;
+            for (var i = 0; i < products.Count; i++)
+            {
+                var symbol = products[i];
+                if (string.IsNullOrWhiteSpace(symbol)) continue;
+                if (!IsPerpProduct(symbol))
+                {
+                    var score = GetSpotProbeScore(symbol);
+                    if (score > bestSpotScore)
+                    {
+                        bestSpotScore = score;
+                        bestSpotSymbol = symbol;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(bestSpotSymbol))
+            {
+                return bestSpotSymbol;
             }
 
             return products[0];
         }
+
+        private static int GetSpotProbeScore(string symbol)
+        {
+            var normalized = (symbol ?? string.Empty).Trim().ToUpperInvariant();
+            if (normalized.Length == 0)
+            {
+                return int.MinValue;
+            }
+
+            if (normalized.Contains("BTC") && (normalized.Contains("USD") || normalized.Contains("USDT") || normalized.Contains("USDC")))
+            {
+                return 100;
+            }
+
+            if (normalized.EndsWith("/USD", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith("-USD", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith("USD", StringComparison.OrdinalIgnoreCase))
+            {
+                return 90;
+            }
+
+            if (normalized.EndsWith("/USDT", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith("-USDT", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith("USDT", StringComparison.OrdinalIgnoreCase))
+            {
+                return 80;
+            }
+
+            if (normalized.EndsWith("/USDC", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith("-USDC", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith("USDC", StringComparison.OrdinalIgnoreCase))
+            {
+                return 70;
+            }
+
+            return 10;
+        }
+
+        private static string NormalizeProductForComparison(string symbol)
+        {
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                return string.Empty;
+            }
+
+            return symbol
+                .Trim()
+                .ToUpperInvariant()
+                .Replace("/", string.Empty)
+                .Replace("-", string.Empty)
+                .Replace("_", string.Empty)
+                .Replace(":", string.Empty)
+                .Replace(" ", string.Empty);
+        }
+
     }
 }

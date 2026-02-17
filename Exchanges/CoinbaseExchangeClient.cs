@@ -598,7 +598,7 @@ namespace CryptoDayTraderSuite.Exchanges
 			return false;
 		}
 
-		public async Task<List<Dictionary<string, object>>> GetOpenOrdersAsync()
+		public async Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
 		{
 			var jsonAdvanced = await PrivateRequestAsync("GET", "/api/v3/brokerage/orders/historical/batch?order_status=OPEN").ConfigureAwait(false);
 			var root = UtilCompat.JsonDeserialize<Dictionary<string, object>>(jsonAdvanced) ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -612,7 +612,46 @@ namespace CryptoDayTraderSuite.Exchanges
 				orders = ReadObjectList(root, "data");
 			}
 
-			return FilterOpenOrders(orders);
+			var filtered = FilterOpenOrders(orders);
+            var list = new List<OpenOrder>();
+            foreach (var row in filtered)
+            {
+                var pid = ReadStringValue(row, "product_id");
+                if (!string.IsNullOrWhiteSpace(productId) && !string.Equals(pid, productId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var oid = ReadStringValue(row, "order_id");
+                var sideStr = ReadStringValue(row, "side");
+                var typeStr = ReadStringValue(row, "order_type");
+                
+                /* Mapping logic for type/side/price */
+                var baseSize = ReadDecimalValue(row, "base_size");
+                if (baseSize <= 0m) baseSize = ReadDecimalValue(row, "size");
+
+                /* limit price might be 'limit_price' or inside 'order_configuration' */
+                var limitPrice = ReadDecimalValue(row, "limit_price");
+                if (limitPrice <= 0m) limitPrice = ReadDecimalValue(row, "price");
+
+                var createdStr = ReadStringValue(row, "created_time");
+                DateTime created; 
+                if (!DateTime.TryParse(createdStr, out created)) created = DateTime.UtcNow;
+
+                list.Add(new OpenOrder
+                {
+                    OrderId = oid,
+                    ProductId = pid,
+                    Side = "BUY".Equals(sideStr, StringComparison.OrdinalIgnoreCase) ? OrderSide.Buy : OrderSide.Sell,
+                    Type = "MARKET".Equals(typeStr, StringComparison.OrdinalIgnoreCase) ? OrderType.Market : OrderType.Limit,
+                    Quantity = baseSize,
+                    FilledQty = ReadDecimalValue(row, "filled_size"),
+                    Price = limitPrice,
+                    Status = ReadStatusValue(row),
+                    CreatedUtc = created
+                });
+            }
+            return list;
 		}
 
 		public async Task<List<Dictionary<string, object>>> GetRecentFillsAsync(int limit = 250)

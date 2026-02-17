@@ -9,6 +9,34 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$CiVersion = '1'
+$CiFields = 'result|decision|exit|autorun_known|autorun_enabled|runnable_profiles|fresh_cycle'
+
+function Complete-Result {
+    param(
+        [string]$Result,
+        [string]$Decision,
+        [int]$ExitCode,
+        [string]$Message
+    )
+
+    $resultText = if ([string]::IsNullOrWhiteSpace($Result)) { 'FAIL' } else { $Result.Trim().ToUpperInvariant() }
+    $decisionText = if ([string]::IsNullOrWhiteSpace($Decision)) { 'unknown' } else { $Decision.Trim().ToLowerInvariant() }
+
+    Write-Output ('CAPTURE_RESULT=' + $resultText)
+    Write-Output ('CAPTURE_DECISION=' + $decisionText)
+    Write-Output ('CI_VERSION=' + $CiVersion)
+    Write-Output ('CI_FIELDS=' + $CiFields)
+    Write-Output ('CI_SUMMARY=version=' + $CiVersion + ';result=' + $resultText + ';decision=' + $decisionText + ';exit=' + $ExitCode + ';autorun_known=' + ([int]$autoRunKnown) + ';autorun_enabled=' + $(if ($autoRunKnown) { [int]$autoRunEnabled } else { -1 }) + ';runnable_profiles=' + $runnableProfiles.Count + ';fresh_cycle=' + ([int]$hasFreshCycle))
+
+    if (-not [string]::IsNullOrWhiteSpace($Message)) {
+        Write-Output $Message
+    }
+
+    Write-Output ('RESULT_EXIT_CODE=' + $ExitCode)
+    exit $ExitCode
+}
+
 function Find-AutoRunSettingConfig {
     $candidates = Get-ChildItem -Path $env:LOCALAPPDATA -Recurse -Filter user.config -ErrorAction SilentlyContinue
     foreach ($file in $candidates) {
@@ -139,14 +167,11 @@ Write-Output ('PRECHECK_LATEST_CYCLE_AGE_MIN=' + $cycleAgeMinutes)
 Write-Output ('PRECHECK_HAS_FRESH_CYCLE=' + ([int]$hasFreshCycle))
 
 if ($RequireAutoRunEnabled.IsPresent -and (-not $autoRunKnown -or -not $autoRunEnabled)) {
-    Write-Output 'PRECHECK_RESULT=FAIL Auto Run persistence flag is not enabled.'
-    exit 2
+    Complete-Result -Result 'FAIL' -Decision 'fail-autorun-not-enabled' -ExitCode 2 -Message 'PRECHECK_RESULT=FAIL Auto Run persistence flag is not enabled.'
 }
 
 if ($RequireRunnableProfile.IsPresent -and $runnableProfiles.Count -lt 1) {
-    Write-Output 'PRECHECK_RESULT=FAIL No enabled Auto profile is bound to an enabled account.'
-    exit 3
+    Complete-Result -Result 'FAIL' -Decision 'fail-no-runnable-profile' -ExitCode 3 -Message 'PRECHECK_RESULT=FAIL No enabled Auto profile is bound to an enabled account.'
 }
 
-Write-Output 'PRECHECK_RESULT=PASS'
-exit 0
+Complete-Result -Result 'PASS' -Decision 'pass' -ExitCode 0 -Message 'PRECHECK_RESULT=PASS'

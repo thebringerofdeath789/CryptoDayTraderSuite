@@ -38,6 +38,9 @@ namespace CryptoDayTraderSuite.UI
             btnRefresh.ForeColor = Theme.Text;
             btnRefresh.BackColor = Theme.ContentBg;
             btnRefresh.FlatAppearance.BorderColor = Theme.PanelBg;
+            btnAccountInsights.ForeColor = Theme.Text;
+            btnAccountInsights.BackColor = Theme.ContentBg;
+            btnAccountInsights.FlatAppearance.BorderColor = Theme.PanelBg;
             SetFreshness("Not loaded", false, true);
         }
 
@@ -68,6 +71,11 @@ namespace CryptoDayTraderSuite.UI
         {
             SetFreshness("Refreshing...", false, true);
             LoadData();
+        }
+
+        private void btnAccountInsights_Click(object sender, EventArgs e)
+        {
+            RaiseNavigationRequest("Insights");
         }
 
         /* 

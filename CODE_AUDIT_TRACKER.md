@@ -670,3 +670,161 @@
 - `Util/run_provider_public_api_probe.ps1` emits deterministic probe exit markers (`PROBE_VERDICT=FAIL`, `RESULT_EXIT_CODE=1`, `PROBE_EXIT_CODE=1`) under geo-constrained conditions.
 - Debug build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
 - Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_202452.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
+
+## Post-Audit Remediation (Iteration 16) - 2026-02-17
+
+### R16 Changes Applied
+
+- Fixed strict certification contract inconsistency in `Util/run_multiexchange_certification.ps1` by aligning strict failure rollups with strict-gated FAIL checks, not only synthetic `Strict requirement:*` checks.
+- Strict failure accounting now includes provider/coverage/reject/build/matrix gate failures when their corresponding strict gates are active.
+- This removes contradictory strict output combinations where `VERDICT=FAIL` could still emit `STRICT_FAILURE_CLASS=NONE` and `STRICT_FAILURE_COUNT=0`.
+
+### R16 Finding Status Updates
+
+- `BUG-OPS-STRICT-ROLLUP-001`: **Closed** (strict failure metadata now matches strict-gated FAIL verdict outcomes).
+
+### R16 Verification
+
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_203323.txt` => `VERDICT=FAIL`, `STRICT_FAILURE_CLASS=OTHER_STRICT`, `STRICT_FAILURE_COUNT=2`, `STRICT_FAILURE_NAMES=Provider public API probe artifacts,Spot+perps coverage`.
+
+## Post-Audit Remediation (Iteration 17) - 2026-02-17
+
+### R17 Changes Applied
+
+- Updated `Util/run_provider_public_api_probe.ps1` to normalize comma-delimited `-Services` input into distinct service tokens, preventing malformed provider artifacts that collapse all services into one unsupported string.
+- Added Bybit-aware failure-class resolution in `Util/run_provider_public_api_probe.ps1` so `ListProductsAsync returned no products` is classified as `ENV-CONSTRAINT` (geo/provider access blocker) instead of `INTEGRATION-ERROR`.
+- Hardened `Exchanges/BybitClient.cs` `GetInstrumentsInfoAsync(...)` to fail closed on non-success `retCode` responses with explicit category/code/message diagnostics.
+
+### R17 Finding Status Updates
+
+- `BUG-OPS-PROBE-SERVICELIST-001`: **Closed** (provider probe now handles CSV-style service input safely).
+- `BUG-OPS-BYBIT-CLASSIFIER-001`: **Closed** (Bybit no-products probe outcome now routes to environment-constraint handling, restoring geo-partial strict behavior).
+
+### R17 Verification
+
+- Provider probe artifact: `obj/runtime_reports/provider_audit/provider_public_api_probe_20260217_204218.json` => `Verdict=PARTIAL`, `EnvConstraint=1`, `IntegrationError=0`, Bybit `FailureClass=ENV-CONSTRAINT`.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_204326.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_POLICY_DECISION=allow-geo-partial`.
+
+## Post-Audit Remediation (Iteration 18) - 2026-02-17
+
+### R18 Changes Applied
+
+- Added provider-service alias canonicalization in `Util/run_multiexchange_certification.ps1` so certification treats `binance-us`/`binance-global` as `Binance`, `bybit-global` as `Bybit`, and `okx-global` as `OKX` during provider probe row matching.
+- Added shared `Find-ProviderProbeRow` lookup and applied it across provider usability filtering, strict provider-status evaluation, spot/perp coverage checks, and policy-backed strategy-exchange evidence synthesis.
+- This removes false missing-service and coverage failures caused by alias-shape drift in provider probe artifacts.
+
+### R18 Finding Status Updates
+
+- `BUG-OPS-PROVIDER-ALIAS-MATCH-001`: **Closed** (strict certification provider matching now canonicalizes service aliases consistently).
+
+### R18 Verification
+
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_204704.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_POLICY_DECISION=allow-geo-partial`.
+
+## Post-Audit Remediation (Iteration 19) - 2026-02-17
+
+### R19 Changes Applied
+
+- Hardened `Services/ExchangeProviderAuditService.cs` to canonicalize service aliases before provider-audit execution, reducing alias-driven audit drift.
+- Extended `ExchangeProviderAuditResult` with `RequestedService` and `CanonicalService` metadata for explicit audit traceability between requested alias and canonical venue.
+- Updated probe symbol resolution to prefer spot products over perp rows when selecting ticker probe targets.
+
+### R19 Finding Status Updates
+
+- `BUG-OPS-AUDIT-ALIAS-DRIFT-001`: **Closed** (provider audit now executes on canonical venues regardless of alias input shape).
+- `BUG-OPS-AUDIT-PROBE-SYMBOL-001`: **Closed** (ticker probe selection no longer defaults to perp rows when spot products exist).
+
+### R19 Verification
+
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_210539.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_POLICY_DECISION=allow-geo-partial`.
+
+## Post-Audit Remediation (Iteration 20) - 2026-02-17
+
+### R20 Changes Applied
+
+- Expanded perp classification heuristics in `Services/ExchangeProviderAuditService.cs` to recognize additional perp naming conventions (`PERPETUAL`, `USDTM`, `:SWAP`, `_PERP`, `-PERP`).
+- Added separator-insensitive preferred-symbol matching and spot-symbol ranking to improve probe symbol quality in mixed product lists.
+- Ranking now prioritizes higher-signal spot symbols (`BTC` with USD/USDT/USDC, then USD/USDT/USDC quote symbols) before generic fallback.
+
+### R20 Finding Status Updates
+
+- `BUG-OPS-AUDIT-PERP-CLASSIFIER-002`: **Closed** (provider audit now detects broader perp naming variants).
+- `BUG-OPS-AUDIT-PROBE-RANKING-001`: **Closed** (probe symbol selection now favors deterministic high-signal spot symbols).
+
+### R20 Verification
+
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_210857.txt` => `VERDICT=FAIL` with single strict failure `Reject category evidence`; provider/build/matrix checks remain passing/geo-partial as expected.
+
+## Post-Audit Remediation (Iteration 21) - 2026-02-17
+
+### R21 Changes Applied
+
+- Hardened `Services/ExchangeProviderAuditService.cs` provider-audit data-path by sanitizing/de-duplicating product lists prior to coverage calculations and probe-symbol resolution.
+- Expanded ticker success criteria to accept either positive `Last` or coherent bid/ask books (`Bid>0`, `Ask>0`, `Ask>=Bid`) for improved resilience against variant ticker payload shapes.
+- Added bounded single-line exception normalization for deterministic provider-audit error payloads under long transport/HTML failure messages.
+
+### R21 Finding Status Updates
+
+- `BUG-OPS-AUDIT-PRODUCT-NORMALIZATION-001`: **Closed** (audit coverage and probe selection now use sanitized unique product lists).
+- `BUG-OPS-AUDIT-TICKER-VALIDATION-001`: **Closed** (ticker validity no longer depends solely on `Last` field presence).
+- `BUG-OPS-AUDIT-ERROR-PAYLOAD-001`: **Closed** (provider-audit error messages now deterministic and bounded).
+
+### R21 Verification
+
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_211842.txt` => `VERDICT=FAIL` with single strict failure `Reject category evidence`; provider/build/matrix checks remain passing/geo-partial as expected.
+
+## Post-Audit Remediation (Iteration 22) - 2026-02-17
+
+### R22 Changes Applied
+
+- Added shared alias normalizer `Services/ExchangeServiceNameNormalizer.cs` as single source of truth for broker canonical names, family keys, audit display names, and global-alias detection.
+- Refactored `Services/ExchangeProvider.cs` to consume shared broker normalization and removed local alias-switch duplication.
+- Refactored `Services/AccountBuyingPowerService.cs` to consume shared family/global alias normalization for provider selection and venue base URL routing.
+- Refactored `Services/ExchangeProviderAuditService.cs` to consume shared audit-service normalization and removed local duplicate service map logic.
+
+### R22 Finding Status Updates
+
+- `BUG-OPS-NORMALIZATION-DRIFT-001`: **Closed** (provider factory, buying-power service routing, and provider-audit canonicalization now share one alias-normalization source).
+
+### R22 Verification
+
+- Touched-file diagnostics: clean (`ExchangeServiceNameNormalizer`, `ExchangeProvider`, `AccountBuyingPowerService`, `ExchangeProviderAuditService`).
+- Full Debug verify build currently blocked by unrelated pre-existing interface rollout errors (`IExchangeClient.GetOpenOrdersAsync(string)` not yet implemented by multiple exchange/wrapper clients).
+
+## Post-Audit Remediation (Iteration 23) - 2026-02-17
+
+### R23 Changes Applied
+
+- Added `GetOpenOrdersAsync(string)` passthrough + retry in `Services/ResilientExchangeClient.cs` to restore interface parity with `IExchangeClient`.
+- Added missing open-order parsing helpers in `Exchanges/BitstampClient.cs` used by its typed `OpenOrder` mapper.
+- Updated `Brokers/CoinbaseExchangeBroker.cs` cancel-all flow to consume typed `OpenOrder` properties instead of dictionary-only field readers.
+
+### R23 Finding Status Updates
+
+- `BUG-OPS-OPENORDERS-WRAPPER-001`: **Closed** (resilient wrapper now fully implements open-orders interface path).
+- `BUG-OPS-OPENORDERS-BROKER-TYPE-001`: **Closed** (coinbase broker cancel-all no longer assumes dictionary-backed open-order rows).
+
+### R23 Verification
+
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_213750.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
+
+## Post-Audit Remediation (Iteration 24) - 2026-02-17
+
+### R24 Changes Applied
+
+- Normalized cancel-all broker behavior by updating `BinanceBroker`, `BybitBroker`, and `OkxBroker` to fetch typed open orders and perform per-order cancellation with explicit attempted/canceled/failed accounting.
+- Removed obsolete dictionary-only open-order parsing helpers in `CoinbaseExchangeBroker` after full typed-model migration.
+
+### R24 Finding Status Updates
+
+- `BUG-OPS-BROKER-CANCELALL-DRIFT-001`: **Closed** (major brokers now share typed open-order cancellation semantics and partial-failure reporting).
+
+### R24 Verification
+
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_214245.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.

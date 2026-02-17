@@ -316,6 +316,59 @@ namespace CryptoDayTraderSuite.Exchanges
             return d;
         }
 
+        public async Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
+        {
+            var json = await PrivatePostAsync("/0/private/OpenOrders", new Dictionary<string, string>());
+            var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+            var list = new List<OpenOrder>();
+            
+            if (obj != null && obj.ContainsKey("result"))
+            {
+                var result = obj["result"] as Dictionary<string, object>;
+                if (result != null && result.ContainsKey("open"))
+                {
+                    var open = result["open"] as Dictionary<string, object>;
+                    if (open != null)
+                    {
+                        foreach (var key in open.Keys)
+                        {
+                            var orderMap = open[key] as Dictionary<string, object>;
+                            if (orderMap == null) continue;
+
+                            var desc = orderMap.ContainsKey("descr") ? orderMap["descr"] as Dictionary<string, object> : null;
+                            var symbol = desc != null && desc.ContainsKey("pair") ? desc["pair"].ToString() : "";
+                            var sideStr = desc != null && desc.ContainsKey("type") ? desc["type"].ToString() : "";
+                            var typeStr = desc != null && desc.ContainsKey("ordertype") ? desc["ordertype"].ToString() : "";
+                            var priceStr = desc != null && desc.ContainsKey("price") ? desc["price"].ToString() : "0";
+                            var volStr = orderMap.ContainsKey("vol") ? orderMap["vol"].ToString() : "0";
+                            var filledStr = orderMap.ContainsKey("vol_exec") ? orderMap["vol_exec"].ToString() : "0";
+                            var statusStr = orderMap.ContainsKey("status") ? orderMap["status"].ToString() : "";
+                            var createdTime = orderMap.ContainsKey("opentm") ? Convert.ToDouble(orderMap["opentm"]) : 0.0;
+
+                            decimal price, vol, filled;
+                            decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out price);
+                            decimal.TryParse(volStr, NumberStyles.Any, CultureInfo.InvariantCulture, out vol);
+                            decimal.TryParse(filledStr, NumberStyles.Any, CultureInfo.InvariantCulture, out filled);
+
+                            list.Add(new OpenOrder
+                            {
+                                OrderId = key,
+                                ProductId = symbol,
+                                Side = string.Equals(sideStr, "buy", StringComparison.OrdinalIgnoreCase) ? OrderSide.Buy : OrderSide.Sell,
+                                Type = string.Equals(typeStr, "market", StringComparison.OrdinalIgnoreCase) ? OrderType.Market : OrderType.Limit,
+                                Price = price,
+                                Quantity = vol,
+                                FilledQty = filled,
+                                Status = statusStr,
+                                CreatedUtc = DateTimeOffset.FromUnixTimeSeconds((long)createdTime).UtcDateTime
+                            });
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
         public async Task<OrderResult> PlaceOrderAsync(OrderRequest req)
         {
             var form = new Dictionary<string, string>();

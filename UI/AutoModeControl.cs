@@ -666,7 +666,8 @@ namespace CryptoDayTraderSuite.UI
 				decimal manualEquity = numEquity == null ? 1000m : numEquity.Value;
 				decimal resolvedEquity = await ResolveEquityForAccountAsync(acc, manualEquity, "manual propose");
 				ProposalBatchResult proposeBatch = await ProposeForAccountAsync(acc, _last, gran, resolvedEquity);
-				List<TradePlan> plans = (_queued = ((proposeBatch != null) ? (proposeBatch.Plans ?? new List<TradePlan>()) : new List<TradePlan>()));
+                UpdateRoutingVenueFooterFromBatch(proposeBatch);
+                List<TradePlan> plans = (_queued = ((proposeBatch != null) ? (proposeBatch.Plans ?? new List<TradePlan>()) : new List<TradePlan>()));
 				int scanGroupsCount = (from r in _last
 					where !string.IsNullOrWhiteSpace(r.Symbol)
 					select r.Symbol).Distinct(StringComparer.OrdinalIgnoreCase).Count();
@@ -721,19 +722,111 @@ namespace CryptoDayTraderSuite.UI
 				if (plans.Count > 0)
 				{
 					allPlans.AddRange(plans);
-				}
+                    foreach (TradePlan plan in plans)
+                    {
+                        if (plan == null || string.IsNullOrWhiteSpace(plan.Note))
+                        {
+                            continue;
+                        }
+                        string chosen = ExtractBracketTagValue(plan.Note, "Route");
+                        if (!string.IsNullOrWhiteSpace(chosen))
+                        {
+                            batch.ChosenVenues.Add(chosen);
+                        }
+                        string alternate = ExtractBracketTagValue(plan.Note, "Alt");
+                        if (!string.IsNullOrWhiteSpace(alternate))
+                        {
+                            batch.AlternateVenues.Add(alternate);
+                        }
+                        string execMode = ExtractBracketTagValue(plan.Note, "ExecMode");
+                        if (!string.IsNullOrWhiteSpace(execMode))
+                        {
+                            batch.ExecutionModes.Add(execMode);
+                        }
+                    }
+                }
 				string reason = ((diag == null || string.IsNullOrWhiteSpace(diag.ReasonCode)) ? "unknown" : diag.ReasonCode);
 				if (!batch.ReasonCounts.ContainsKey(reason))
 				{
 					batch.ReasonCounts[reason] = 0;
 				}
 				batch.ReasonCounts[reason] = batch.ReasonCounts[reason] + 1;
+                if (string.Equals(reason, "routing-unavailable", StringComparison.OrdinalIgnoreCase))
+                {
+                    batch.RoutingUnavailableCount++;
+                }
+                else if (reason.IndexOf("policy-health", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    batch.PolicyHealthBlockedCount++;
+                }
+                else if (reason.IndexOf("regime", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    batch.RegimeBlockedCount++;
+                }
+                else if (reason.IndexOf("circuit", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    batch.CircuitBreakerObservedCount++;
+                }
 			}
 			batch.Plans = allPlans;
 			return batch;
 		}
 
-		private Dictionary<string, int> CreateRejectCategoryCounter()
+		private string ExtractBracketTagValue(string text, string tagName)
+        {
+            if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(tagName))
+            {
+                return string.Empty;
+            }
+            string token = "[" + tagName + "=";
+            int start = text.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+            if (start < 0)
+            {
+                return string.Empty;
+            }
+            start += token.Length;
+            int end = text.IndexOf(']', start);
+            if (end <= start)
+            {
+                return string.Empty;
+            }
+            string value = text.Substring(start, end - start).Trim();
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value;
+        }
+
+        private string SummarizeList(string prefix, string csv, int maxItems)
+        {
+            if (maxItems <= 0)
+            {
+                maxItems = 3;
+            }
+            List<string> values = (from value in (csv ?? string.Empty).Split(new char[1] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                select value.Trim() into value
+                where !string.IsNullOrWhiteSpace(value)
+                select value).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (values.Count == 0)
+            {
+                return prefix + ": n/a";
+            }
+            IEnumerable<string> head = values.Take(maxItems);
+            string more = (values.Count > maxItems) ? (" +" + (values.Count - maxItems) + " more") : string.Empty;
+            return prefix + ": " + string.Join(", ", head) + more;
+        }
+
+        private void UpdateRoutingVenueFooterFromBatch(ProposalBatchResult batch)
+        {
+            if (batch == null)
+            {
+                return;
+            }
+            string chosenCsv = string.Join(", ", (batch.ChosenVenues ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+            string alternateCsv = string.Join(", ", (batch.AlternateVenues ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+            string modeCsv = string.Join(", ", (batch.ExecutionModes ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+            _lastRoutingSummaryText = SummarizeList("Routing", chosenCsv, 3) + " | " + SummarizeList("Alt", alternateCsv, 3) + " | " + SummarizeList("Exec", modeCsv, 3);
+            _lastVenueHealthSummaryText = "Venue Health: policy=" + batch.PolicyHealthBlockedCount + ", regime=" + batch.RegimeBlockedCount + ", circuit=" + batch.CircuitBreakerObservedCount + ", routing-unavail=" + batch.RoutingUnavailableCount;
+        }
+
+        private Dictionary<string, int> CreateRejectCategoryCounter()
 		{
 			Dictionary<string, int> counter = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 			foreach (string category in CertificationRejectCategories)
@@ -1021,8 +1114,15 @@ namespace CryptoDayTraderSuite.UI
 					return;
 				}
 				List<string> cycleStats = new List<string>();
-				Dictionary<string, int> cycleRejectReasonCounts = CreateRejectCategoryCounter();
-				cycleTelemetry = new AutoCycleTelemetry
+                Dictionary<string, int> cycleRejectReasonCounts = CreateRejectCategoryCounter();
+                List<string> cycleChosenVenues = new List<string>();
+                List<string> cycleAlternateVenues = new List<string>();
+                List<string> cycleExecutionModes = new List<string>();
+                int cycleRoutingUnavailableCount = 0;
+                int cyclePolicyHealthBlockedCount = 0;
+                int cycleRegimeBlockedCount = 0;
+                int cycleCircuitBreakerObservedCount = 0;
+                cycleTelemetry = new AutoCycleTelemetry
 				{
 					CycleId = Guid.NewGuid().ToString("N"),
 					StartedUtc = DateTime.UtcNow,
@@ -1114,9 +1214,25 @@ namespace CryptoDayTraderSuite.UI
 						if (proposeBatch != null && proposeBatch.ReasonCounts != null)
 						{
 							proposeBatch.ReasonCounts.TryGetValue("no-signal", out noSignalCount);
-							proposeBatch.ReasonCounts.TryGetValue("ai-veto", out aiVetoCount);
-							proposeBatch.ReasonCounts.TryGetValue("bias-blocked", out biasBlockedCount);
-							AccumulateRejectCategoryCounts(cycleRejectReasonCounts, proposeBatch.ReasonCounts);
+                            proposeBatch.ReasonCounts.TryGetValue("ai-veto", out aiVetoCount);
+                            proposeBatch.ReasonCounts.TryGetValue("bias-blocked", out biasBlockedCount);
+                            AccumulateRejectCategoryCounts(cycleRejectReasonCounts, proposeBatch.ReasonCounts);
+                            if (proposeBatch.ChosenVenues != null && proposeBatch.ChosenVenues.Count > 0)
+                            {
+                                cycleChosenVenues.AddRange(proposeBatch.ChosenVenues);
+                            }
+                            if (proposeBatch.AlternateVenues != null && proposeBatch.AlternateVenues.Count > 0)
+                            {
+                                cycleAlternateVenues.AddRange(proposeBatch.AlternateVenues);
+                            }
+                            if (proposeBatch.ExecutionModes != null && proposeBatch.ExecutionModes.Count > 0)
+                            {
+                                cycleExecutionModes.AddRange(proposeBatch.ExecutionModes);
+                            }
+                            cycleRoutingUnavailableCount += proposeBatch.RoutingUnavailableCount;
+                            cyclePolicyHealthBlockedCount += proposeBatch.PolicyHealthBlockedCount;
+                            cycleRegimeBlockedCount += proposeBatch.RegimeBlockedCount;
+                            cycleCircuitBreakerObservedCount += proposeBatch.CircuitBreakerObservedCount;
 						}
 						profileTelemetry.ProposedCount = plans.Count;
 						profileTelemetry.NoSignalCount = noSignalCount;
@@ -1214,8 +1330,15 @@ namespace CryptoDayTraderSuite.UI
 					Log.Info("[AutoMode][RejectEvidence] cycle=" + (cycleTelemetry.CycleId ?? "(unknown)") + " observed=" + observedCycleRejects, "RunAutoCycleAsync", "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AutoModeControl.cs", 929);
 				}
 				cycleTelemetry.EndedUtc = DateTime.UtcNow;
-				cycleTelemetry.Summary = summary;
-				cycleTelemetry.ProcessedProfileCount = cycleTelemetry.Profiles.Count;
+                cycleTelemetry.Summary = summary;
+                cycleTelemetry.RoutingChosenVenues = string.Join(", ", cycleChosenVenues.Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+                cycleTelemetry.RoutingAlternateVenues = string.Join(", ", cycleAlternateVenues.Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+                cycleTelemetry.RoutingExecutionModes = string.Join(", ", cycleExecutionModes.Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+                cycleTelemetry.RoutingUnavailableCount = cycleRoutingUnavailableCount;
+                cycleTelemetry.PolicyHealthBlockedCount = cyclePolicyHealthBlockedCount;
+                cycleTelemetry.RegimeBlockedCount = cycleRegimeBlockedCount;
+                cycleTelemetry.CircuitBreakerObservedCount = cycleCircuitBreakerObservedCount;
+                cycleTelemetry.ProcessedProfileCount = cycleTelemetry.Profiles.Count;
 				cycleTelemetry.ExecutedProfiles = cycleTelemetry.Profiles.Count((ProfileCycleTelemetry p) => string.Equals(p.Status, "executed", StringComparison.OrdinalIgnoreCase));
 				cycleTelemetry.FailedProfiles = cycleTelemetry.Profiles.Count((ProfileCycleTelemetry p) => string.Equals(p.Status, "blocked", StringComparison.OrdinalIgnoreCase) || string.Equals(p.Status, "error", StringComparison.OrdinalIgnoreCase));
 				EvaluateReliabilityGates(cycleTelemetry);
@@ -2600,7 +2723,9 @@ namespace CryptoDayTraderSuite.UI
 					lblTelemetrySummary.ForeColor = Color.DarkOrange;
 					return;
 				}
-				lblTelemetrySummary.Text = string.Format("Telemetry: {0} | profiles {1}/{2} | executed {3} | blocked {4} | gates {5} (no-signal:{6}, ai-veto:{7}, risk-veto:{8}, success:{9}) | matrix {10} (guardrails:{11}, containment:{12}, coverage:{13}) | {14}", latest.Name, telemetry.ProcessedProfileCount, telemetry.EnabledProfileCount, telemetry.ExecutedProfiles, telemetry.FailedProfiles, string.IsNullOrWhiteSpace(telemetry.GateStatus) ? "n/a" : telemetry.GateStatus, telemetry.GateNoSignalObserved ? "obs" : "na", telemetry.GateAiVetoObserved ? "obs" : "na", telemetry.GateRiskVetoObserved ? "obs" : "na", telemetry.GateSuccessObserved ? "obs" : "na", string.IsNullOrWhiteSpace(telemetry.MatrixStatus) ? "n/a" : telemetry.MatrixStatus, telemetry.MatrixIndependentGuardrailsObserved ? "obs" : "na", telemetry.MatrixFailureContainmentObserved ? "obs" : "na", telemetry.MatrixMinimumProfileCoverage ? "obs" : "na", (telemetry.EndedUtc == default(DateTime)) ? "pending" : telemetry.EndedUtc.ToLocalTime().ToString("HH:mm:ss"));
+				_lastRoutingSummaryText = SummarizeList("Routing", telemetry.RoutingChosenVenues, 3) + " | " + SummarizeList("Alt", telemetry.RoutingAlternateVenues, 3) + " | " + SummarizeList("Exec", telemetry.RoutingExecutionModes, 3);
+                _lastVenueHealthSummaryText = "Venue Health: policy=" + telemetry.PolicyHealthBlockedCount + ", regime=" + telemetry.RegimeBlockedCount + ", circuit=" + telemetry.CircuitBreakerObservedCount + ", routing-unavail=" + telemetry.RoutingUnavailableCount;
+                lblTelemetrySummary.Text = string.Format("Telemetry: {0} | profiles {1}/{2} | executed {3} | blocked {4} | gates {5} (no-signal:{6}, ai-veto:{7}, risk-veto:{8}, success:{9}) | matrix {10} (guardrails:{11}, containment:{12}, coverage:{13}) | {14} | {15} | {16}", latest.Name, telemetry.ProcessedProfileCount, telemetry.EnabledProfileCount, telemetry.ExecutedProfiles, telemetry.FailedProfiles, string.IsNullOrWhiteSpace(telemetry.GateStatus) ? "n/a" : telemetry.GateStatus, telemetry.GateNoSignalObserved ? "obs" : "na", telemetry.GateAiVetoObserved ? "obs" : "na", telemetry.GateRiskVetoObserved ? "obs" : "na", telemetry.GateSuccessObserved ? "obs" : "na", string.IsNullOrWhiteSpace(telemetry.MatrixStatus) ? "n/a" : telemetry.MatrixStatus, telemetry.MatrixIndependentGuardrailsObserved ? "obs" : "na", telemetry.MatrixFailureContainmentObserved ? "obs" : "na", telemetry.MatrixMinimumProfileCoverage ? "obs" : "na", (telemetry.EndedUtc == default(DateTime)) ? "pending" : telemetry.EndedUtc.ToLocalTime().ToString("HH:mm:ss"), _lastRoutingSummaryText, _lastVenueHealthSummaryText);
 				lblTelemetrySummary.ForeColor = ((telemetry.FailedProfiles > 0 || !string.Equals(telemetry.MatrixStatus, "PASS", StringComparison.OrdinalIgnoreCase) || !string.Equals(telemetry.GateStatus, "PASS", StringComparison.OrdinalIgnoreCase)) ? Color.DarkOrange : Color.DarkGreen);
 			}
 			catch (Exception ex)
@@ -2813,6 +2938,7 @@ cycleTelemetry.MatrixStatus = (pass ? "PASS" : (cycleTelemetry.MatrixMinimumProf
 
 	}
 }
+
 
 
 

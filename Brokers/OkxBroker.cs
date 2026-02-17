@@ -172,10 +172,42 @@ namespace CryptoDayTraderSuite.Brokers
                 var normalizedSymbol = NormalizeOkxSymbol(symbol);
                 if (string.IsNullOrWhiteSpace(normalizedSymbol)) return (false, BuildFailureMessage("validation", null, "symbol is invalid after normalization"));
                 var client = CreateClient(null);
-                var ok = await client.CancelAllOpenOrdersAsync(normalizedSymbol).ConfigureAwait(false);
-                return ok
-                    ? (true, BuildSuccessMessage("canceled", "symbol=" + normalizedSymbol + " canceled open orders"))
-                    : (false, BuildFailureMessage("cancel", null, "cancel-all failed for symbol=" + normalizedSymbol));
+                var openOrders = await client.GetOpenOrdersAsync(normalizedSymbol).ConfigureAwait(false);
+                if (openOrders == null) return (false, BuildFailureMessage("cancel", null, "failed to fetch open orders"));
+
+                int canceled = 0;
+                int attempted = 0;
+                int failed = 0;
+                foreach (var order in openOrders)
+                {
+                    if (order == null || string.IsNullOrWhiteSpace(order.OrderId))
+                    {
+                        continue;
+                    }
+
+                    var productId = NormalizeOkxSymbol(order.ProductId);
+                    if (!string.Equals(productId, normalizedSymbol, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    attempted++;
+                    if (await client.CancelOrderAsync(order.OrderId).ConfigureAwait(false))
+                    {
+                        canceled++;
+                    }
+                    else
+                    {
+                        failed++;
+                    }
+                }
+
+                if (failed > 0)
+                {
+                    return (false, BuildFailureMessage("cancel", "symbol=" + normalizedSymbol + " attempted=" + attempted + " canceled=" + canceled + " failed=" + failed, "cancel-all partial failure"));
+                }
+
+                return (true, BuildSuccessMessage("canceled", "symbol=" + normalizedSymbol + " canceled=" + canceled));
             }
             catch (Exception ex)
             {
