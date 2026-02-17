@@ -1,0 +1,338 @@
+using System;
+using System.Threading.Tasks;
+using CryptoDayTraderSuite.Exchanges;
+using CryptoDayTraderSuite.Models;
+using CryptoDayTraderSuite.Services;
+using CryptoDayTraderSuite.Util;
+
+namespace CryptoDayTraderSuite.Brokers
+{
+    public class CoinbaseExchangeBroker : IBroker
+    {
+        private readonly IKeyService _keyService;
+        private readonly IAccountService _accountService;
+
+        public CoinbaseExchangeBroker(IKeyService keyService, IAccountService accountService)
+        {
+            _keyService = keyService ?? throw new ArgumentNullException(nameof(keyService));
+            _accountService = accountService ?? throw new ArgumentNullException(nameof(accountService));
+        }
+
+        public string Service { get { return "coinbase-advanced"; } }
+
+        public BrokerCapabilities GetCapabilities()
+        {
+            return new BrokerCapabilities
+            {
+                SupportsMarketEntry = true,
+                SupportsProtectiveExits = false,
+                EnforcesPrecisionRules = true,
+                Notes = "Native bracket/OCO exits are unavailable; requires local protective watchdog in Auto Mode."
+            };
+        }
+
+        public async Task<(bool ok, string message)> ValidateTradePlanAsync(TradePlan plan)
+        {
+            if (plan == null) return (false, "trade plan is null");
+            if (string.IsNullOrWhiteSpace(plan.Symbol)) return (false, "symbol is required");
+            if (plan.Qty <= 0m) return (false, "invalid quantity");
+            if (plan.Entry <= 0m) return (false, "entry must be greater than zero");
+            if (plan.Stop <= 0m || plan.Target <= 0m) return (false, "protective stop/target required");
+            if (plan.Direction == 0) return (false, "direction must be non-zero");
+
+            if (plan.Direction > 0)
+            {
+                if (!(plan.Stop < plan.Entry && plan.Entry < plan.Target))
+                {
+                    return (false, "invalid long risk geometry (expected stop < entry < target)");
+                }
+            }
+            else
+            {
+                if (!(plan.Target < plan.Entry && plan.Entry < plan.Stop))
+                {
+                    return (false, "invalid short risk geometry (expected target < entry < stop)");
+                }
+            }
+
+            try
+            {
+                var client = CreateClient(plan.AccountId);
+                var normalizedSymbol = NormalizeCoinbaseSymbol(plan.Symbol);
+                if (string.IsNullOrWhiteSpace(normalizedSymbol))
+                {
+                    return (false, "symbol is invalid after normalization");
+                }
+
+                var constraints = await client.GetSymbolConstraintsAsync(normalizedSymbol).ConfigureAwait(false);
+                if (constraints == null)
+                {
+                    return (false, "unable to resolve coinbase symbol constraints");
+                }
+
+                if (constraints.StepSize > 0m)
+                {
+                    var alignedQty = AlignDownToStep(plan.Qty, constraints.StepSize);
+                    if (alignedQty <= 0m)
+                    {
+                        return (false, "quantity rounds below minimum step size");
+                    }
+
+                    if (alignedQty != plan.Qty)
+                    {
+                        return (false, "quantity does not align with symbol step size");
+                    }
+                }
+
+                if (constraints.MinQty > 0m && plan.Qty < constraints.MinQty)
+                {
+                    return (false, "quantity below symbol minimum");
+                }
+
+                if (constraints.MaxQty > 0m && plan.Qty > constraints.MaxQty)
+                {
+                    return (false, "quantity above symbol maximum");
+                }
+
+                if (constraints.PriceTickSize > 0m)
+                {
+                    if (!IsAlignedToStep(plan.Entry, constraints.PriceTickSize))
+                    {
+                        return (false, "entry does not align with symbol price tick");
+                    }
+
+                    if (!IsAlignedToStep(plan.Stop, constraints.PriceTickSize))
+                    {
+                        return (false, "stop does not align with symbol price tick");
+                    }
+
+                    if (!IsAlignedToStep(plan.Target, constraints.PriceTickSize))
+                    {
+                        return (false, "target does not align with symbol price tick");
+                    }
+                }
+
+                var notional = plan.Entry * plan.Qty;
+                if (constraints.MinNotional > 0m && notional < constraints.MinNotional)
+                {
+                    return (false, "order notional below symbol minimum");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[CoinbaseExchangeBroker] Constraint validation failed: " + ex.Message);
+                return (false, "unable to validate symbol constraints");
+            }
+
+            return (true, "ok");
+        }
+
+        public async Task<(bool ok, string message)> PlaceOrderAsync(TradePlan plan)
+        {
+            try
+            {
+                var validation = await ValidateTradePlanAsync(plan).ConfigureAwait(false);
+                if (!validation.ok) return (false, validation.message);
+                var client = CreateClient(plan.AccountId);
+                var normalizedSymbol = NormalizeCoinbaseSymbol(plan.Symbol);
+                if (string.IsNullOrWhiteSpace(normalizedSymbol))
+                {
+                    return (false, "symbol is invalid after normalization");
+                }
+
+                var order = new OrderRequest
+                {
+                    ProductId = normalizedSymbol,
+                    Side = plan.Direction > 0 ? OrderSide.Buy : OrderSide.Sell,
+                    Type = OrderType.Market,
+                    Quantity = plan.Qty,
+                    Tif = TimeInForce.GTC,
+                    ClientOrderId = "cdts-" + Guid.NewGuid().ToString("N")
+                };
+
+                return await PlaceWithClientAsync(client, order).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("coinbase place failed: " + ex.Message, ex);
+                return (false, ex.Message);
+            }
+        }
+
+        private async Task<(bool ok, string message)> PlaceWithClientAsync(CoinbaseExchangeClient client, OrderRequest order)
+        {
+            var result = await client.PlaceOrderAsync(order);
+            if (result == null) return (false, "empty order result");
+            if (!result.Accepted) return (false, string.IsNullOrWhiteSpace(result.Message) ? "order rejected" : result.Message);
+            return (true, "accepted order=" + (result.OrderId ?? "(unknown)"));
+        }
+
+        private string UnprotectOrRaw(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            var decrypted = _keyService.Unprotect(value);
+            if (!string.IsNullOrWhiteSpace(decrypted)) return decrypted;
+            return value;
+        }
+
+        private decimal AlignDownToStep(decimal quantity, decimal stepSize)
+        {
+            if (quantity <= 0m || stepSize <= 0m)
+            {
+                return 0m;
+            }
+
+            var steps = Math.Floor(quantity / stepSize);
+            var aligned = stepSize * steps;
+            if (aligned < 0m)
+            {
+                return 0m;
+            }
+
+            return aligned;
+        }
+
+        private bool IsAlignedToStep(decimal value, decimal stepSize)
+        {
+            if (value <= 0m || stepSize <= 0m)
+            {
+                return false;
+            }
+
+            return AlignDownToStep(value, stepSize) == value;
+        }
+
+        private CoinbaseExchangeClient CreateClient(string accountId)
+        {
+            var account = !string.IsNullOrWhiteSpace(accountId)
+                ? _accountService.Get(accountId)
+                : null;
+
+            var keyId = account != null ? account.KeyEntryId : null;
+            if (string.IsNullOrWhiteSpace(keyId)) keyId = _keyService.GetActiveId(Service);
+            if (string.IsNullOrWhiteSpace(keyId)) keyId = _keyService.GetActiveId("coinbase-exchange");
+            if (string.IsNullOrWhiteSpace(keyId)) throw new InvalidOperationException("no active coinbase-advanced key selected");
+
+            var keyEntry = _keyService.Get(keyId);
+            if (keyEntry == null) throw new InvalidOperationException("coinbase-advanced key not found");
+
+            var apiKey = UnprotectOrRaw(!string.IsNullOrEmpty(keyEntry.ApiKey) ? keyEntry.ApiKey : keyEntry.Data["ApiKey"]);
+            var apiSecret = UnprotectOrRaw(!string.IsNullOrEmpty(keyEntry.ApiSecretBase64)
+                ? keyEntry.ApiSecretBase64
+                : (!string.IsNullOrEmpty(keyEntry.Secret) ? keyEntry.Secret : keyEntry.Data["ApiSecretBase64"]));
+            var passphrase = UnprotectOrRaw(!string.IsNullOrEmpty(keyEntry.Passphrase) ? keyEntry.Passphrase : keyEntry.Data["Passphrase"]);
+            var apiKeyName = !string.IsNullOrEmpty(keyEntry.ApiKeyName) ? keyEntry.ApiKeyName : keyEntry.Data["ApiKeyName"];
+            var ecPrivateKeyPem = UnprotectOrRaw(!string.IsNullOrEmpty(keyEntry.ECPrivateKeyPem) ? keyEntry.ECPrivateKeyPem : keyEntry.Data["ECPrivateKeyPem"]);
+
+            CoinbaseCredentialNormalizer.NormalizeCoinbaseAdvancedInputs(ref apiKey, ref apiSecret, ref apiKeyName, ref ecPrivateKeyPem);
+            if (string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(apiKeyName)) apiKey = apiKeyName;
+            if (string.IsNullOrWhiteSpace(apiSecret) && !string.IsNullOrWhiteSpace(ecPrivateKeyPem)) apiSecret = ecPrivateKeyPem;
+
+            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
+                throw new InvalidOperationException("incomplete coinbase credentials");
+
+            return new CoinbaseExchangeClient(apiKey, apiSecret, passphrase);
+        }
+
+        public async Task<(bool ok, string message)> CancelAllAsync(string symbol)
+        {
+            try
+            {
+                var cli = CreateClient(null);
+                var openOrders = await cli.GetOpenOrdersAsync();
+                if (openOrders == null) return (false, "failed to fetch open orders");
+
+                var normalizedSymbol = NormalizeCoinbaseSymbol(symbol);
+
+                int canceled = 0;
+                foreach (var order in openOrders)
+                {
+                    if (order == null) continue;
+
+                    var orderId = ReadOrderId(order);
+                    if (string.IsNullOrWhiteSpace(orderId)) continue;
+
+                    var productId = ReadStringValue(order, "product_id");
+                    if (string.IsNullOrWhiteSpace(productId)) productId = ReadStringValue(order, "productId");
+                    productId = NormalizeCoinbaseSymbol(productId);
+
+                    if (!string.IsNullOrWhiteSpace(normalizedSymbol))
+                    {
+                        if (!string.Equals(productId, normalizedSymbol, StringComparison.OrdinalIgnoreCase)) continue;
+                    }
+
+                    if (await cli.CancelOrderAsync(orderId).ConfigureAwait(false)) canceled++;
+                }
+
+                return (true, "canceled=" + canceled);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("coinbase cancel failed: " + ex.Message, ex);
+                return (false, ex.Message);
+            }
+        }
+
+        private string NormalizeCoinbaseSymbol(string symbol)
+        {
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                return string.Empty;
+            }
+
+            return symbol
+                .Trim()
+                .Replace("/", "-")
+                .Replace("_", "-")
+                .ToUpperInvariant();
+        }
+
+        private string ReadOrderId(System.Collections.Generic.Dictionary<string, object> row)
+        {
+            var value = ReadStringValue(row, "id");
+            if (string.IsNullOrWhiteSpace(value)) value = ReadStringValue(row, "order_id");
+            if (string.IsNullOrWhiteSpace(value)) value = ReadStringValue(row, "orderId");
+            return value;
+        }
+
+        private string ReadStringValue(System.Collections.Generic.Dictionary<string, object> row, string key)
+        {
+            if (row == null || string.IsNullOrWhiteSpace(key)) return string.Empty;
+
+            object raw;
+            if (TryGetObjectValue(row, key, out raw) && raw != null)
+            {
+                return raw.ToString();
+            }
+
+            return string.Empty;
+        }
+
+        private bool TryGetObjectValue(System.Collections.Generic.Dictionary<string, object> row, string key, out object value)
+        {
+            value = null;
+            if (row == null || string.IsNullOrWhiteSpace(key))
+            {
+                return false;
+            }
+
+            if (row.ContainsKey(key))
+            {
+                value = row[key];
+                return value != null;
+            }
+
+            foreach (var pair in row)
+            {
+                if (pair.Key == null) continue;
+                if (string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = pair.Value;
+                    return value != null;
+                }
+            }
+
+            return false;
+        }
+    }
+}

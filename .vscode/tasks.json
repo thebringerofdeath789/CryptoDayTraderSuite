@@ -1,0 +1,108 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "provider-public-api-probe",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"Util/run_provider_public_api_probe.ps1"
+			]
+		},
+		{
+			"label": "multiexchange-certification",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"Util/run_multiexchange_certification.ps1"
+			]
+		},
+		{
+			"label": "multiexchange-certification-strict",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"Util/run_multiexchange_certification.ps1",
+				"-RequireBuildPass",
+				"-RequireMatrixPass",
+				"-RequireProviderArtifacts",
+				"-RequireRejectCategories"
+			]
+		},
+		{
+			"label": "strict-cert-once",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"Util/run_multiexchange_certification.ps1",
+				"-RequireBuildPass",
+				"-RequireMatrixPass",
+				"-RequireProviderArtifacts",
+				"-RequireRejectCategories"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "strict-cert-once-2",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"Util/run_multiexchange_certification.ps1",
+				"-RequireBuildPass",
+				"-RequireMatrixPass",
+				"-RequireProviderArtifacts",
+				"-RequireRejectCategories"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "strict-cert-once-3",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"Util/run_multiexchange_certification.ps1",
+				"-RequireBuildPass",
+				"-RequireMatrixPass",
+				"-RequireProviderArtifacts",
+				"-RequireRejectCategories"
+			],
+			"isBackground": false
+		}
+	]
+}

@@ -1,0 +1,61 @@
+﻿Multi-Exchange Certification Report
+GeneratedUtc: 2026-02-17T09:32:44.2605915Z
+Verdict: PARTIAL
+Freshness: overall=PASS | matrix=PASS(5.05h/24h) | provider=PASS(1.29h/24h) | reject=PASS(0.01h/24h)
+
+Checks:
+- [PASS] Phase19 required files :: All required service/exchange/broker files present.
+- [PASS] Build :: Debug build succeeded (OutDir=bin\\Debug_Verify\\).
+- [PASS] AutoMode matrix artifact :: MatrixStatus=PASS from cycle_20260217_042933794_54530515.json
+- [PASS] AutoMode matrix artifact freshness :: Freshness OK: cycle_20260217_042933794_54530515.json age=5.05h (max=24h).
+- [PASS] Policy-backed row evidence artifact :: Generated strategy_exchange_policy_evidence_20260217_093244.json
+- [PASS] Strategy x exchange row evidence :: Row evidence coverage complete (30/30).
+- [PARTIAL] Geo/provider access blocker :: Environment-constrained venue access detected; certification continues with blocker noted.
+- [PARTIAL] Provider public API probe artifacts :: Provider probe environment/provider constraints: Binance(ENV-CONSTRAINT), Bybit(ENV-CONSTRAINT) Source=provider_public_api_probe_20260217_081528.json
+- [PASS] Provider probe artifact freshness :: Freshness OK: provider_public_api_probe_20260217_081528.json age=1.29h (max=24h).
+- [PARTIAL] Spot/perp geo-access blocker :: Spot/perp coverage deferred by environment-constrained venues; certification continues with blocker noted.
+- [PARTIAL] Spot+perps coverage :: Spot/perp coverage deferred by environment constraints: spot-env-waived=Binance,Bybit ; perp-env-waived=Binance,Bybit Source=provider_public_api_probe_20260217_081528.json
+- [PASS] Reject category evidence :: Source=log_20260217_52.txt, observed=fees-kill
+- [PASS] Reject evidence freshness :: Freshness OK: log_20260217_68.txt age=0.01h (max=24h).
+
+Reject Categories (latest log):
+- ai-veto = 0
+- bias-blocked = 0
+- fees-kill = 1
+- no-signal = 0
+- routing-unavailable = 0
+- slippage-kill = 0
+
+Strategy x Exchange Matrix:
+- VWAP Trend | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- VWAP Trend | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- VWAP Trend | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- VWAP Trend | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- VWAP Trend | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | Coinbase Advanced | FAIL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | Kraken | FAIL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+
+Recommended Next Action: Geo/provider blockers are documented; continue non-geo reliability hardening and keep strict certification as PARTIAL baseline evidence.

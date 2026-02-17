@@ -1,0 +1,40 @@
+﻿{
+    "ReportType":  "ProviderPublicApiAudit",
+    "GeneratedUtc":  "2026-02-17T09:34:59.0348506Z",
+    "Verdict":  "FAIL",
+    "AssemblyPath":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\bin\\Debug_Verify\\CryptoDayTraderSuite.exe",
+    "PreferredSymbol":  "BTC-USD",
+    "RequiredServices":  [
+                             "Coinbase"
+                         ],
+    "Summary":  {
+                    "Passed":  0,
+                    "EnvConstraint":  0,
+                    "ProviderError":  0,
+                    "IntegrationError":  1,
+                    "SpotCoverage":  1,
+                    "PerpCoverage":  1,
+                    "MissingRequired":  0,
+                    "TotalRequired":  1
+                },
+    "Results":  [
+                    {
+                        "Service":  "Coinbase",
+                        "Status":  "FAIL",
+                        "FailureClass":  "INTEGRATION-ERROR",
+                        "FailureReason":  "The DateTimeStyles value RoundtripKind cannot be used with the values AssumeLocal, AssumeUniversal or AdjustToUniversal.\r\nParameter name: styles",
+                        "PublicClientCreated":  true,
+                        "ProductDiscoverySucceeded":  true,
+                        "TickerSucceeded":  false,
+                        "SpotCoverage":  true,
+                        "PerpCoverage":  true,
+                        "ProbeSymbol":  "BTC-USD",
+                        "ProductCount":  789,
+                        "SpotProductCount":  786,
+                        "PerpProductCount":  3,
+                        "DiscoveryLatencyMs":  233,
+                        "TickerLatencyMs":  0,
+                        "Error":  "The DateTimeStyles value RoundtripKind cannot be used with the values AssumeLocal, AssumeUniversal or AdjustToUniversal.\r\nParameter name: styles"
+                    }
+                ]
+}

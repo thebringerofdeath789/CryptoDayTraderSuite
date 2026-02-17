@@ -1,0 +1,41 @@
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\obj\Debug\CryptoDayTraderSuite.csproj.AssemblyReference.cache
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\obj\Debug\CryptoDayTraderSuite.Properties.Resources.resources
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\obj\Debug\CryptoDayTraderSuite.csproj.GenerateResource.cache
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\obj\Debug\CryptoDayTraderSuite.csproj.CoreCompileInputs.cache
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\bin\Debug\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\bin\Debug\CryptoDayTraderSuite.exe
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\bin\Debug\CryptoDayTraderSuite.pdb
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\obj\Debug\CryptoDayTraderSuite.exe
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\obj\Debug\CryptoDayTraderSuite.pdb
+C:\Users\admin\Downloads\CryptoDayTraderSuite_regenerated\obj\Debug\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\obj\Debug\CryptoDayTraderSuite.csproj.AssemblyReference.cache
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\obj\Debug\CryptoDayTraderSuite.Properties.Resources.resources
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\obj\Debug\CryptoDayTraderSuite.csproj.GenerateResource.cache
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\obj\Debug\CryptoDayTraderSuite.csproj.CoreCompileInputs.cache
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\obj\Debug\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\obj\Debug\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Proof\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Proof\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Proof\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_AccountInsights\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_AccountInsights\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_AccountInsights\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe2\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe2\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe2\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe3\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe3\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe3\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe4\CryptoDayTraderSuite.exe.config
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe4\CryptoDayTraderSuite.exe
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify_Probe4\CryptoDayTraderSuite.pdb
+C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\obj\Debug\CryptoDayTraderSuite.exe.config

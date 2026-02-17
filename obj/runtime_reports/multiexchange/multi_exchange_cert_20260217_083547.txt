@@ -1,0 +1,55 @@
+﻿Multi-Exchange Certification Report
+GeneratedUtc: 2026-02-17T08:35:47.3860130Z
+Verdict: FAIL
+
+Checks:
+- [PASS] Phase19 required files :: All required service/exchange/broker files present.
+- [FAIL] Build :: Debug build failed. C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\Exchanges\CoinbaseExchangeClient.cs(358,10): error CS0103: The name 'ReadBoolValue' does not exist in the current context [C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\CryptoDayTraderSuite.csproj] | C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\Exchanges\CoinbaseExchangeClient.cs(382,12): error CS0103: The name 'ReadObjectList' does not exist in the current context [C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\CryptoDayTraderSuite.csproj] | 
+- [PARTIAL] AutoMode matrix artifact :: MatrixStatus=PARTIAL from cycle_20260217_060912187_d6f9e91d.json
+- [PASS] Policy-backed row evidence artifact :: Generated strategy_exchange_policy_evidence_20260217_083547.json
+- [PASS] Strategy x exchange row evidence :: Row evidence coverage complete (30/30).
+- [PARTIAL] Provider public API probe artifacts :: Provider probe environment/provider constraints: Binance(ENV-CONSTRAINT), Bybit(ENV-CONSTRAINT) Source=provider_public_api_probe_20260217_081528.json
+- [PARTIAL] Spot+perps coverage :: Spot/perp coverage deferred by environment constraints: spot-env-waived=Binance,Bybit ; perp-env-waived=Binance,Bybit Source=provider_public_api_probe_20260217_081528.json
+- [PARTIAL] Reject category evidence :: Source=log_20260217_54.txt, no tracked reject categories found.
+
+Reject Categories (latest log):
+- ai-veto = 0
+- bias-blocked = 0
+- fees-kill = 0
+- no-signal = 0
+- routing-unavailable = 0
+- slippage-kill = 0
+
+Strategy x Exchange Matrix:
+- VWAP Trend | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- VWAP Trend | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- VWAP Trend | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- VWAP Trend | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- VWAP Trend | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- ORB | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- RSI Reversion | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Donchian | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | Coinbase Advanced | FAIL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Funding Carry | Kraken | FAIL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | Binance | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | Coinbase Advanced | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | Bybit | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | OKX | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+- Cross-Exchange Spread Divergence | Kraken | PARTIAL | evidence=Services/StrategyExchangePolicyService.cs
+
+Recommended Next Action: Fix FAIL checks first; re-run certification runner after remediation.

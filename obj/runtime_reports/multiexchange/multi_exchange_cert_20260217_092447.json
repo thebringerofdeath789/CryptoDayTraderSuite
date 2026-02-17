@@ -1,0 +1,380 @@
+﻿{
+    "ReportType":  "MultiExchangeCertification",
+    "GeneratedUtc":  "2026-02-17T09:24:47.5153633Z",
+    "Verdict":  "FAIL",
+    "Repository":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite",
+    "Inputs":  {
+                   "MaxMatrixArtifactAgeHours":  0,
+                   "AutoModeReportsDir":  "C:\\Users\\admin\\AppData\\Local\\CryptoDayTraderSuite\\automode\\cycle_reports",
+                   "MaxProviderProbeAgeHours":  0,
+                   "LogRoot":  "C:\\Users\\admin\\AppData\\Local\\CryptoDayTraderSuite\\logs",
+                   "LatestLogFile":  "C:\\Users\\admin\\AppData\\Local\\CryptoDayTraderSuite\\logs\\log_20260217_66.txt",
+                   "LatestCycleReport":  "C:\\Users\\admin\\AppData\\Local\\CryptoDayTraderSuite\\automode\\cycle_reports\\cycle_20260217_042933794_54530515.json",
+                   "RowEvidenceDir":  "",
+                   "MaxRejectEvidenceAgeHours":  0
+               },
+    "Checks":  [
+                   {
+                       "Detail":  "All required service/exchange/broker files present.",
+                       "Status":  "PASS",
+                       "Name":  "Phase19 required files"
+                   },
+                   {
+                       "Detail":  "Debug build succeeded (OutDir=bin\\\\Debug_Verify\\\\).",
+                       "Status":  "PASS",
+                       "Name":  "Build"
+                   },
+                   {
+                       "Detail":  "MatrixStatus=PASS from cycle_20260217_042933794_54530515.json",
+                       "Status":  "PASS",
+                       "Name":  "AutoMode matrix artifact"
+                   },
+                   {
+                       "Detail":  "Evidence is stale: cycle_20260217_042933794_54530515.json age=4.92h exceeds max=0h.",
+                       "Status":  "PARTIAL",
+                       "Name":  "AutoMode matrix artifact freshness"
+                   },
+                   {
+                       "Detail":  "Generated strategy_exchange_policy_evidence_20260217_092447.json",
+                       "Status":  "PASS",
+                       "Name":  "Policy-backed row evidence artifact"
+                   },
+                   {
+                       "Detail":  "Row evidence coverage complete (30/30).",
+                       "Status":  "PASS",
+                       "Name":  "Strategy x exchange row evidence"
+                   },
+                   {
+                       "Detail":  "Environment-constrained venue access detected; certification continues with blocker noted.",
+                       "Status":  "PARTIAL",
+                       "Name":  "Geo/provider access blocker"
+                   },
+                   {
+                       "Detail":  "Provider probe environment/provider constraints: Binance(ENV-CONSTRAINT), Bybit(ENV-CONSTRAINT) Source=provider_public_api_probe_20260217_081528.json",
+                       "Status":  "PARTIAL",
+                       "Name":  "Provider public API probe artifacts"
+                   },
+                   {
+                       "Detail":  "Evidence is stale: provider_public_api_probe_20260217_081528.json age=1.16h exceeds max=0h.",
+                       "Status":  "PARTIAL",
+                       "Name":  "Provider probe artifact freshness"
+                   },
+                   {
+                       "Detail":  "Spot/perp coverage deferred by environment-constrained venues; certification continues with blocker noted.",
+                       "Status":  "PARTIAL",
+                       "Name":  "Spot/perp geo-access blocker"
+                   },
+                   {
+                       "Detail":  "Spot/perp coverage deferred by environment constraints: spot-env-waived=Binance,Bybit ; perp-env-waived=Binance,Bybit Source=provider_public_api_probe_20260217_081528.json",
+                       "Status":  "PARTIAL",
+                       "Name":  "Spot+perps coverage"
+                   },
+                   {
+                       "Detail":  "Source=log_20260217_52.txt, observed=fees-kill",
+                       "Status":  "PASS",
+                       "Name":  "Reject category evidence"
+                   },
+                   {
+                       "Detail":  "Freshness OK: log_20260217_66.txt age=0h (max=0h).",
+                       "Status":  "PASS",
+                       "Name":  "Reject evidence freshness"
+                   },
+                   {
+                       "Detail":  "Strict mode requires fresh evidence; AutoMode matrix artifact freshness is PARTIAL.",
+                       "Status":  "FAIL",
+                       "Name":  "Strict requirement: AutoMode matrix artifact freshness"
+                   },
+                   {
+                       "Detail":  "Strict mode requires fresh evidence; Provider probe artifact freshness is PARTIAL.",
+                       "Status":  "FAIL",
+                       "Name":  "Strict requirement: Provider probe artifact freshness"
+                   }
+               ],
+    "RejectCategories":  {
+                             "fees-kill":  1,
+                             "bias-blocked":  0,
+                             "slippage-kill":  0,
+                             "ai-veto":  0,
+                             "routing-unavailable":  0,
+                             "no-signal":  0
+                         },
+    "StrategyExchangeMatrix":  [
+                                   {
+                                       "Strategy":  "VWAP Trend",
+                                       "Exchange":  "Binance",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "VWAP Trend",
+                                       "Exchange":  "Coinbase Advanced",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "VWAP Trend",
+                                       "Exchange":  "Bybit",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "VWAP Trend",
+                                       "Exchange":  "OKX",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "VWAP Trend",
+                                       "Exchange":  "Kraken",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "ORB",
+                                       "Exchange":  "Binance",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "ORB",
+                                       "Exchange":  "Coinbase Advanced",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "ORB",
+                                       "Exchange":  "Bybit",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "ORB",
+                                       "Exchange":  "OKX",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "ORB",
+                                       "Exchange":  "Kraken",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "RSI Reversion",
+                                       "Exchange":  "Binance",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "RSI Reversion",
+                                       "Exchange":  "Coinbase Advanced",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "RSI Reversion",
+                                       "Exchange":  "Bybit",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "RSI Reversion",
+                                       "Exchange":  "OKX",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "RSI Reversion",
+                                       "Exchange":  "Kraken",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "Donchian",
+                                       "Exchange":  "Binance",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "Donchian",
+                                       "Exchange":  "Coinbase Advanced",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "Donchian",
+                                       "Exchange":  "Bybit",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "Donchian",
+                                       "Exchange":  "OKX",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "Donchian",
+                                       "Exchange":  "Kraken",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "Funding Carry",
+                                       "Exchange":  "Binance",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "Funding Carry",
+                                       "Exchange":  "Coinbase Advanced",
+                                       "Status":  "FAIL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Runtime policy matrix blocks strategy on venue (contract evidence)."
+                                   },
+                                   {
+                                       "Strategy":  "Funding Carry",
+                                       "Exchange":  "Bybit",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "Funding Carry",
+                                       "Exchange":  "OKX",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "Funding Carry",
+                                       "Exchange":  "Kraken",
+                                       "Status":  "FAIL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Runtime policy matrix blocks strategy on venue (contract evidence)."
+                                   },
+                                   {
+                                       "Strategy":  "Cross-Exchange Spread Divergence",
+                                       "Exchange":  "Binance",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "Cross-Exchange Spread Divergence",
+                                       "Exchange":  "Coinbase Advanced",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "Cross-Exchange Spread Divergence",
+                                       "Exchange":  "Bybit",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Venue blocked by environment constraints; deferred evidence (provider_public_api_probe_20260217_081528.json)."
+                                   },
+                                   {
+                                       "Strategy":  "Cross-Exchange Spread Divergence",
+                                       "Exchange":  "OKX",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   },
+                                   {
+                                       "Strategy":  "Cross-Exchange Spread Divergence",
+                                       "Exchange":  "Kraken",
+                                       "Status":  "PARTIAL",
+                                       "EvidenceRef":  "Services/StrategyExchangePolicyService.cs",
+                                       "EvidenceSource":  "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\obj\\runtime_reports\\strategy_exchange_evidence\\strategy_exchange_policy_evidence_20260217_092447.json",
+                                       "Detail":  "Policy + provider evidence present; live row-level runtime/backtest evidence pending."
+                                   }
+                               ],
+    "Summary":  {
+                    "StrategiesRequired":  [
+                                               "VWAP Trend",
+                                               "ORB",
+                                               "RSI Reversion",
+                                               "Donchian",
+                                               "Funding Carry",
+                                               "Cross-Exchange Spread Divergence"
+                                           ],
+                    "RequiredPerpServices":  [
+                                                 "Coinbase",
+                                                 "Binance",
+                                                 "Bybit"
+                                             ],
+                    "ExchangesRequired":  [
+                                              "Binance",
+                                              "Coinbase Advanced",
+                                              "Bybit",
+                                              "OKX",
+                                              "Kraken"
+                                          ],
+                    "RequiredSpotServices":  [
+                                                 "Coinbase",
+                                                 "Binance",
+                                                 "Bybit",
+                                                 "OKX",
+                                                 "Kraken"
+                                             ],
+                    "MatrixStatus":  "PASS",
+                    "MatrixCoverage":  false,
+                    "MatrixRowEvidenceCoverage":  {
+                                                      "EvidencedRows":  30,
+                                                      "TotalRows":  30,
+                                                      "MissingRows":  0
+                                                  }
+                },
+    "RecommendedNextAction":  "Refresh matrix/provider/reject evidence artifacts (or relax freshness thresholds), then re-run strict certification."
+}

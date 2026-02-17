@@ -1,0 +1,19 @@
+﻿PRECHECK_CONFIG_PATH=C:\Users\admin\AppData\Local\G_Trading_Tools\CryptoDayTraderSuite.exe_StrongName_1a1nio4qaegqixpwlsre5ugdxbmiyyvb\1.0.0.0\user.config
+PRECHECK_AUTORUN_KNOWN=1
+PRECHECK_AUTORUN_ENABLED=1
+PRECHECK_CYCLE_DIR=C:\Users\admin\AppData\Local\CryptoDayTraderSuite\automode\cycle_reports
+PRECHECK_LATEST_CYCLE=C:\Users\admin\AppData\Local\CryptoDayTraderSuite\automode\cycle_reports\cycle_20260217_060912187_d6f9e91d.json
+PRECHECK_LATEST_CYCLE_AGE_MIN=172
+PRECHECK_HAS_FRESH_CYCLE=0
+PRECHECK_RESULT=PASS
+CYCLE_JSON=C:\Users\admin\AppData\Local\CryptoDayTraderSuite\automode\cycle_reports\cycle_20260217_060912187_d6f9e91d.json
+CYCLE_IS_FRESH=0
+LOG_FILE=C:\Users\admin\AppData\Local\CryptoDayTraderSuite\logs\log_20260217_59.txt
+LOG_IS_FRESH=1
+REJECT_OBSERVED_CYCLE=none
+REJECT_OBSERVED_LOG=none
+REJECT_OBSERVED_MERGED=none
+REPORT_JSON=C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\obj\runtime_reports\multiexchange\multi_exchange_cert_20260217_090225.json
+VERDICT=PARTIAL
+DEFAULT_CERT_EXIT=0
+RESULT:PARTIAL no fresh cycle artifact detected; ensure Auto Run is enabled before capture.

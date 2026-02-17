@@ -1,0 +1,53 @@
+﻿Multi-Exchange Certification Report
+GeneratedUtc: 2026-02-17T07:43:31.7251396Z
+Verdict: PARTIAL
+
+Checks:
+- [PASS] Phase19 required files :: All required service/exchange/broker files present.
+- [PASS] Build :: Debug build succeeded (OutDir=bin\\Debug_Verify\\).
+- [PARTIAL] AutoMode matrix artifact :: MatrixStatus=PARTIAL from cycle_20260217_060912187_d6f9e91d.json
+- [PARTIAL] StrategyÃ—exchange row evidence :: Row evidence coverage incomplete (0/30). Missing examples: VWAP Trend@Binance, VWAP Trend@Coinbase Advanced, VWAP Trend@Bybit
+- [PARTIAL] Provider public API probe artifacts :: Provider probe environment/provider constraints: Binance(ENV-CONSTRAINT), Bybit(ENV-CONSTRAINT) Source=provider_public_api_probe_20260217_073444.json
+- [PARTIAL] Reject category evidence :: Source=log_20260217_51.txt, no tracked reject categories found.
+
+Reject Categories (latest log):
+- ai-veto = 0
+- bias-blocked = 0
+- fees-kill = 0
+- no-signal = 0
+- routing-unavailable = 0
+- slippage-kill = 0
+
+Strategy x Exchange Matrix:
+- VWAP Trend | Binance | PARTIAL | evidence=<missing>
+- VWAP Trend | Coinbase Advanced | PARTIAL | evidence=<missing>
+- VWAP Trend | Bybit | PARTIAL | evidence=<missing>
+- VWAP Trend | OKX | PARTIAL | evidence=<missing>
+- VWAP Trend | Kraken | PARTIAL | evidence=<missing>
+- ORB | Binance | PARTIAL | evidence=<missing>
+- ORB | Coinbase Advanced | PARTIAL | evidence=<missing>
+- ORB | Bybit | PARTIAL | evidence=<missing>
+- ORB | OKX | PARTIAL | evidence=<missing>
+- ORB | Kraken | PARTIAL | evidence=<missing>
+- RSI Reversion | Binance | PARTIAL | evidence=<missing>
+- RSI Reversion | Coinbase Advanced | PARTIAL | evidence=<missing>
+- RSI Reversion | Bybit | PARTIAL | evidence=<missing>
+- RSI Reversion | OKX | PARTIAL | evidence=<missing>
+- RSI Reversion | Kraken | PARTIAL | evidence=<missing>
+- Donchian | Binance | PARTIAL | evidence=<missing>
+- Donchian | Coinbase Advanced | PARTIAL | evidence=<missing>
+- Donchian | Bybit | PARTIAL | evidence=<missing>
+- Donchian | OKX | PARTIAL | evidence=<missing>
+- Donchian | Kraken | PARTIAL | evidence=<missing>
+- Funding Carry | Binance | PARTIAL | evidence=<missing>
+- Funding Carry | Coinbase Advanced | PARTIAL | evidence=<missing>
+- Funding Carry | Bybit | PARTIAL | evidence=<missing>
+- Funding Carry | OKX | PARTIAL | evidence=<missing>
+- Funding Carry | Kraken | PARTIAL | evidence=<missing>
+- Cross-Exchange Spread Divergence | Binance | PARTIAL | evidence=<missing>
+- Cross-Exchange Spread Divergence | Coinbase Advanced | PARTIAL | evidence=<missing>
+- Cross-Exchange Spread Divergence | Bybit | PARTIAL | evidence=<missing>
+- Cross-Exchange Spread Divergence | OKX | PARTIAL | evidence=<missing>
+- Cross-Exchange Spread Divergence | Kraken | PARTIAL | evidence=<missing>
+
+Recommended Next Action: Run strict matrix + provider probe artifact capture to upgrade PARTIAL to PASS.

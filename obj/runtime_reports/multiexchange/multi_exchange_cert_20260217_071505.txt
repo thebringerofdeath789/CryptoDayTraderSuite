@@ -1,0 +1,52 @@
+﻿Multi-Exchange Certification Report
+GeneratedUtc: 2026-02-17T07:15:05.3888608Z
+Verdict: FAIL
+
+Checks:
+- [PASS] Phase19 required files :: All required service/exchange/broker files present.
+- [FAIL] Build :: Debug build failed. C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\Microsoft.Common.CurrentVersion.targets(4916,5): error MSB3027: Could not copy "obj\Debug\CryptoDayTraderSuite.exe" to "bin\Debug\CryptoDayTraderSuite.exe". Exceeded retry count of 10. Failed. The file is locked by: "Windows PowerShell (248176)" [C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\CryptoDayTraderSuite.csproj] | C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\Microsoft.Common.CurrentVersion.targets(4916,5): error MSB3021: Unable to copy file "obj\Debug\CryptoDayTraderSuite.exe" to "bin\Debug\CryptoDayTraderSuite.exe". The process cannot access the file 'bin\Debug\CryptoDayTraderSuite.exe' because it is being used by another process. [C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\CryptoDayTraderSuite.csproj] | 
+- [PARTIAL] AutoMode matrix artifact :: MatrixStatus=PARTIAL from cycle_20260217_060912187_d6f9e91d.json
+- [PARTIAL] Provider public API probe artifacts :: Provider probe implementation exists; runtime PASS/FAIL probe artifact aggregation not yet exported by app service.
+- [PARTIAL] Reject category evidence :: Source=log_20260217_51.txt, no tracked reject categories found.
+
+Reject Categories (latest log):
+- ai-veto = 0
+- bias-blocked = 0
+- fees-kill = 0
+- no-signal = 0
+- routing-unavailable = 0
+- slippage-kill = 0
+
+Strategy x Exchange Matrix:
+- VWAP Trend | Binance | PARTIAL
+- VWAP Trend | Coinbase Advanced | PARTIAL
+- VWAP Trend | Bybit | PARTIAL
+- VWAP Trend | OKX | PARTIAL
+- VWAP Trend | Kraken | PARTIAL
+- ORB | Binance | PARTIAL
+- ORB | Coinbase Advanced | PARTIAL
+- ORB | Bybit | PARTIAL
+- ORB | OKX | PARTIAL
+- ORB | Kraken | PARTIAL
+- RSI Reversion | Binance | PARTIAL
+- RSI Reversion | Coinbase Advanced | PARTIAL
+- RSI Reversion | Bybit | PARTIAL
+- RSI Reversion | OKX | PARTIAL
+- RSI Reversion | Kraken | PARTIAL
+- Donchian | Binance | PARTIAL
+- Donchian | Coinbase Advanced | PARTIAL
+- Donchian | Bybit | PARTIAL
+- Donchian | OKX | PARTIAL
+- Donchian | Kraken | PARTIAL
+- Funding Carry | Binance | PARTIAL
+- Funding Carry | Coinbase Advanced | PARTIAL
+- Funding Carry | Bybit | PARTIAL
+- Funding Carry | OKX | PARTIAL
+- Funding Carry | Kraken | PARTIAL
+- Cross-Exchange Spread Divergence | Binance | PARTIAL
+- Cross-Exchange Spread Divergence | Coinbase Advanced | PARTIAL
+- Cross-Exchange Spread Divergence | Bybit | PARTIAL
+- Cross-Exchange Spread Divergence | OKX | PARTIAL
+- Cross-Exchange Spread Divergence | Kraken | PARTIAL
+
+Recommended Next Action: Fix FAIL checks first; re-run certification runner after remediation.

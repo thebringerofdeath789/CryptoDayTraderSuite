@@ -1,0 +1,6 @@
+﻿Provider Public API Probe
+GeneratedUtc: 2026-02-17T09:35:29.7384423Z
+Verdict: PASS
+Assembly: C:\Users\admin\Documents\Visual Studio 2022\Projects\CryptoDayTraderSuite\bin\Debug_Verify\CryptoDayTraderSuite.exe
+
+- [PASS] Coinbase | create=True discover=True ticker=True spot=True perp=True symbol=ETH-USD products=789 (spot=786,perp=3) lat(ms)=277/31 error= failureClass=PASS

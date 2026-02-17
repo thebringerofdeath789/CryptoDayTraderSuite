@@ -1,0 +1,919 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|c:\\users\\admin\\documents\\visual studio 2022\\projects\\cryptodaytradersuite\\models\\projection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:models\\projection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|c:\\users\\admin\\documents\\visual studio 2022\\projects\\cryptodaytradersuite\\ui\\aboutform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\aboutform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\aboutform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\aboutform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\accountsform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\accountsform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\keysform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\keysform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\dashboardcontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\dashboardcontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\accounteditdialog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\accounteditdialog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\keyeditdialog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\keyeditdialog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\util\\sortablebindinglist.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:util\\sortablebindinglist.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\models\\keyentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:models\\keyentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\models\\profilemodels.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:models\\profilemodels.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_extrabuttons.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_extrabuttons.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\themes\\modernlighttheme.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:themes\\modernlighttheme.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_menu.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_menu.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\themes\\lighttheme.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:themes\\lighttheme.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_tooltips.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_tooltips.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\util\\jsonutil.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:util\\jsonutil.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\exchanges\\coinbaseexchangeclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:exchanges\\coinbaseexchangeclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\mainform_predictionhook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:mainform_predictionhook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\services\\autoplanner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:services\\autoplanner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\models\\accountmodels.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:models\\accountmodels.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\services\\historystore.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:services\\historystore.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\exchanges\\krakenclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:exchanges\\krakenclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\exchanges\\bitstampclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:exchanges\\bitstampclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\models\\enums.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:models\\enums.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\brokers\\bitstampbroker.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:brokers\\bitstampbroker.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\brokers\\krakenbroker.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:brokers\\krakenbroker.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\exchanges\\iexchangeclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:exchanges\\iexchangeclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\dashboardcontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\dashboardcontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\tradingcontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\tradingcontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\backtest\\backtester.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:backtest\\backtester.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\strategy\\featureextractor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:strategy\\featureextractor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{00000000-0000-0000-0000-000000000000}|\u003CSolution\u003E|CryptoDayTraderSuite||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\models\\predictionmodels.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:models\\predictionmodels.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_themehook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_themehook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_responsive.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_responsive.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_loghook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_loghook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_hooks.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_hooks.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_helpers.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_helpers.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\keysform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\keysform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\keyeditdialog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\keyeditdialog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\automodeform_objective.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\automodeform_objective.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\automodeform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\automodeform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\accountsform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\accountsform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\accounteditdialog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\accounteditdialog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\mainform_predictionhook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:mainform_predictionhook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\services\\accountregistry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:services\\accountregistry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\services\\keyregistry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:services\\keyregistry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\services\\profilestore.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:services\\profilestore.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_loghook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_loghook.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\mainform_tooltips.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\mainform_tooltips.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\ui\\automodeform.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:ui\\automodeform.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Brokers\\CoinbaseExchangeBroker.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{08060A9F-87D0-45D1-B53D-3321DA5DE1E5}|CryptoDayTraderSuite.csproj|solutionrelative:Brokers\\CoinbaseExchangeBroker.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 8,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "AboutForm.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AboutForm.cs",
+              "RelativeDocumentMoniker": "UI\\AboutForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AboutForm.cs [Design]",
+              "RelativeToolTip": "UI\\AboutForm.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-24T01:24:58.672Z",
+              "EditorCaption": " [Design]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Projection.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\Projection.cs",
+              "RelativeDocumentMoniker": "Models\\Projection.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\Projection.cs",
+              "RelativeToolTip": "Models\\Projection.cs",
+              "ViewState": "AgIAAB4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-21T21:32:03.661Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "AccountsForm.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AccountsForm.cs",
+              "RelativeDocumentMoniker": "UI\\AccountsForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AccountsForm.cs",
+              "RelativeToolTip": "UI\\AccountsForm.cs",
+              "ViewState": "AgIAAGUAAAAAAAAAAAAMwA4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T08:04:02.633Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "KeyEntry.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\KeyEntry.cs",
+              "RelativeDocumentMoniker": "Models\\KeyEntry.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\KeyEntry.cs",
+              "RelativeToolTip": "Models\\KeyEntry.cs",
+              "ViewState": "AgIAACoAAAAAAAAAAAAswBMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:49:18.155Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "MainForm.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\MainForm.cs",
+              "RelativeDocumentMoniker": "MainForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\MainForm.cs",
+              "RelativeToolTip": "MainForm.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACkAAAAvAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T21:01:08.486Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "MainForm_ExtraButtons.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_ExtraButtons.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_ExtraButtons.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_ExtraButtons.cs",
+              "RelativeToolTip": "UI\\MainForm_ExtraButtons.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:56:10.306Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "KeysForm.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\KeysForm.cs",
+              "RelativeDocumentMoniker": "UI\\KeysForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\KeysForm.cs",
+              "RelativeToolTip": "UI\\KeysForm.cs",
+              "ViewState": "AgIAAA0AAAAAAAAAAAAAAG0AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:52:00.02Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "AccountEditDialog.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AccountEditDialog.cs",
+              "RelativeDocumentMoniker": "UI\\AccountEditDialog.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AccountEditDialog.cs",
+              "RelativeToolTip": "UI\\AccountEditDialog.cs",
+              "ViewState": "AgIAAAUAAAAAAAAAAAAhwFAAAABhAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T08:03:49.229Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "DashboardControl.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\DashboardControl.cs",
+              "RelativeDocumentMoniker": "UI\\DashboardControl.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\DashboardControl.cs",
+              "RelativeToolTip": "UI\\DashboardControl.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T21:03:50.191Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "AboutForm.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AboutForm.cs",
+              "RelativeDocumentMoniker": "UI\\AboutForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AboutForm.cs",
+              "RelativeToolTip": "UI\\AboutForm.cs",
+              "ViewState": "AgIAAFIAAAAAAAAAAAAAAFYAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T20:48:58.675Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "KeyEditDialog.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\KeyEditDialog.cs",
+              "RelativeDocumentMoniker": "UI\\KeyEditDialog.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\KeyEditDialog.cs",
+              "RelativeToolTip": "UI\\KeyEditDialog.cs",
+              "ViewState": "AgIAAAcAAAAAAAAAAAAhwGsAAAA8AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T08:02:18.383Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "SortableBindingList.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Util\\SortableBindingList.cs",
+              "RelativeDocumentMoniker": "Util\\SortableBindingList.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Util\\SortableBindingList.cs",
+              "RelativeToolTip": "Util\\SortableBindingList.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAEEAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T21:15:15.082Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "LightTheme.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Themes\\LightTheme.cs",
+              "RelativeDocumentMoniker": "Themes\\LightTheme.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Themes\\LightTheme.cs",
+              "RelativeToolTip": "Themes\\LightTheme.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAGIAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T20:48:38.268Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "ProfileModels.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\ProfileModels.cs",
+              "RelativeDocumentMoniker": "Models\\ProfileModels.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\ProfileModels.cs",
+              "RelativeToolTip": "Models\\ProfileModels.cs",
+              "ViewState": "AgIAAJwAAAAAAAAAAAAnwF4AAAAdAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T08:09:10.252Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 22,
+              "Title": "AccountModels.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\AccountModels.cs",
+              "RelativeDocumentMoniker": "Models\\AccountModels.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\AccountModels.cs",
+              "RelativeToolTip": "Models\\AccountModels.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAMAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T08:25:29.71Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 21,
+              "Title": "AutoPlanner.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\AutoPlanner.cs",
+              "RelativeDocumentMoniker": "Services\\AutoPlanner.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\AutoPlanner.cs",
+              "RelativeToolTip": "Services\\AutoPlanner.cs",
+              "ViewState": "AgIAAEQAAAAAAAAAAAAIwAEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T00:08:53.636Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "MainForm.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm.cs",
+              "RelativeToolTip": "UI\\MainForm.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T20:51:53.86Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "ModernLightTheme.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Themes\\ModernLightTheme.cs",
+              "RelativeDocumentMoniker": "Themes\\ModernLightTheme.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Themes\\ModernLightTheme.cs",
+              "RelativeToolTip": "Themes\\ModernLightTheme.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAIoAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T20:51:36.03Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "MainForm_Menu.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Menu.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_Menu.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Menu.cs",
+              "RelativeToolTip": "UI\\MainForm_Menu.cs",
+              "ViewState": "AgIAADMAAAAAAAAAAAASwNkAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:36:29.725Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 23,
+              "Title": "HistoryStore.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\HistoryStore.cs",
+              "RelativeDocumentMoniker": "Services\\HistoryStore.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\HistoryStore.cs",
+              "RelativeToolTip": "Services\\HistoryStore.cs",
+              "ViewState": "AgIAAIsAAAAAAAAAAAAowJcAAAAwAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:52:24.009Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "MainForm_Tooltips.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Tooltips.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_Tooltips.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Tooltips.cs",
+              "RelativeToolTip": "UI\\MainForm_Tooltips.cs",
+              "ViewState": "AgIAADAAAAAAAAAAAAAqwFUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:12:03.024Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 24,
+              "Title": "KrakenClient.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Exchanges\\KrakenClient.cs",
+              "RelativeDocumentMoniker": "Exchanges\\KrakenClient.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Exchanges\\KrakenClient.cs",
+              "RelativeToolTip": "Exchanges\\KrakenClient.cs",
+              "ViewState": "AgIAABAAAAAAAAAAAAAiwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T05:25:36.037Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "JsonUtil.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Util\\JsonUtil.cs",
+              "RelativeDocumentMoniker": "Util\\JsonUtil.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Util\\JsonUtil.cs",
+              "RelativeToolTip": "Util\\JsonUtil.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T08:02:12.046Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 19,
+              "Title": "CoinbaseExchangeClient.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Exchanges\\CoinbaseExchangeClient.cs",
+              "RelativeDocumentMoniker": "Exchanges\\CoinbaseExchangeClient.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Exchanges\\CoinbaseExchangeClient.cs",
+              "RelativeToolTip": "Exchanges\\CoinbaseExchangeClient.cs",
+              "ViewState": "AgIAAHAAAAAAAAAAAAAIwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T07:26:38.391Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 20,
+              "Title": "MainForm_PredictionHook.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\MainForm_PredictionHook.cs",
+              "RelativeDocumentMoniker": "MainForm_PredictionHook.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\MainForm_PredictionHook.cs",
+              "RelativeToolTip": "MainForm_PredictionHook.cs",
+              "ViewState": "AgIAABMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:40:32.463Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 25,
+              "Title": "BitstampClient.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Exchanges\\BitstampClient.cs",
+              "RelativeDocumentMoniker": "Exchanges\\BitstampClient.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Exchanges\\BitstampClient.cs",
+              "RelativeToolTip": "Exchanges\\BitstampClient.cs",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAiwBEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T05:26:51.002Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 26,
+              "Title": "Enums.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\Enums.cs",
+              "RelativeDocumentMoniker": "Models\\Enums.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\Enums.cs",
+              "RelativeToolTip": "Models\\Enums.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T08:36:21.645Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 27,
+              "Title": "BitstampBroker.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Brokers\\BitstampBroker.cs",
+              "RelativeDocumentMoniker": "Brokers\\BitstampBroker.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Brokers\\BitstampBroker.cs",
+              "RelativeToolTip": "Brokers\\BitstampBroker.cs",
+              "ViewState": "AgIAAEQAAAAAAAAAAAD4v2EAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T05:22:35.537Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 28,
+              "Title": "KrakenBroker.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Brokers\\KrakenBroker.cs",
+              "RelativeDocumentMoniker": "Brokers\\KrakenBroker.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Brokers\\KrakenBroker.cs",
+              "RelativeToolTip": "Brokers\\KrakenBroker.cs",
+              "ViewState": "AgIAAEsAAAAAAAAAAAD4vwAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T05:22:03.172Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 29,
+              "Title": "IExchangeClient.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Exchanges\\IExchangeClient.cs",
+              "RelativeDocumentMoniker": "Exchanges\\IExchangeClient.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Exchanges\\IExchangeClient.cs",
+              "RelativeToolTip": "Exchanges\\IExchangeClient.cs",
+              "ViewState": "AgIAAAQAAAAAAAAAAAD4vwAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T22:47:18.567Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 30,
+              "Title": "DashboardControl.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\DashboardControl.cs",
+              "RelativeDocumentMoniker": "UI\\DashboardControl.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\DashboardControl.cs [Design]",
+              "RelativeToolTip": "UI\\DashboardControl.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-13T00:09:38.811Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 31,
+              "Title": "TradingControl.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\TradingControl.cs",
+              "RelativeDocumentMoniker": "UI\\TradingControl.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\TradingControl.cs",
+              "RelativeToolTip": "UI\\TradingControl.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T21:35:24.046Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 32,
+              "Title": "Backtester.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Backtest\\Backtester.cs",
+              "RelativeDocumentMoniker": "Backtest\\Backtester.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Backtest\\Backtester.cs",
+              "RelativeToolTip": "Backtest\\Backtester.cs",
+              "ViewState": "AgIAACoAAAAAAAAAAAD4vwAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T21:28:46.211Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 33,
+              "Title": "FeatureExtractor.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Strategy\\FeatureExtractor.cs",
+              "RelativeDocumentMoniker": "Strategy\\FeatureExtractor.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Strategy\\FeatureExtractor.cs",
+              "RelativeToolTip": "Strategy\\FeatureExtractor.cs",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAmwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T21:28:16.703Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 55,
+              "Title": "CoinbaseExchangeBroker.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Brokers\\CoinbaseExchangeBroker.cs",
+              "RelativeDocumentMoniker": "Brokers\\CoinbaseExchangeBroker.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Brokers\\CoinbaseExchangeBroker.cs",
+              "RelativeToolTip": "Brokers\\CoinbaseExchangeBroker.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:56:37.188Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 34,
+              "Title": "CryptoDayTraderSuite",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\CryptoDayTraderSuite.csproj",
+              "RelativeDocumentMoniker": "CryptoDayTraderSuite.csproj",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\CryptoDayTraderSuite.csproj",
+              "RelativeToolTip": "CryptoDayTraderSuite.csproj",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-08-12T00:46:30.076Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 35,
+              "Title": "PredictionModels.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\PredictionModels.cs",
+              "RelativeDocumentMoniker": "Models\\PredictionModels.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Models\\PredictionModels.cs",
+              "RelativeToolTip": "Models\\PredictionModels.cs",
+              "ViewState": "AgIAADcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T22:47:29.22Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 36,
+              "Title": "MainForm_ThemeHook.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_ThemeHook.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_ThemeHook.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_ThemeHook.cs [Design]",
+              "RelativeToolTip": "UI\\MainForm_ThemeHook.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:56:15.547Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 37,
+              "Title": "MainForm_Responsive.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Responsive.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_Responsive.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Responsive.cs [Design]",
+              "RelativeToolTip": "UI\\MainForm_Responsive.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:56:14.829Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 39,
+              "Title": "MainForm_Hooks.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Hooks.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_Hooks.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Hooks.cs [Design]",
+              "RelativeToolTip": "UI\\MainForm_Hooks.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:56:12.141Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 40,
+              "Title": "MainForm_Helpers.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Helpers.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_Helpers.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Helpers.cs [Design]",
+              "RelativeToolTip": "UI\\MainForm_Helpers.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:56:11.176Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 41,
+              "Title": "KeysForm.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\KeysForm.cs",
+              "RelativeDocumentMoniker": "UI\\KeysForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\KeysForm.cs [Design]",
+              "RelativeToolTip": "UI\\KeysForm.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:56:09.488Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 42,
+              "Title": "KeyEditDialog.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\KeyEditDialog.cs",
+              "RelativeDocumentMoniker": "UI\\KeyEditDialog.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\KeyEditDialog.cs [Design]",
+              "RelativeToolTip": "UI\\KeyEditDialog.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:56:08.62Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 38,
+              "Title": "MainForm_LogHook.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_LogHook.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_LogHook.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_LogHook.cs [Design]",
+              "RelativeToolTip": "UI\\MainForm_LogHook.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:35:28.026Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 43,
+              "Title": "AutoModeForm_Objective.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AutoModeForm_Objective.cs",
+              "RelativeDocumentMoniker": "UI\\AutoModeForm_Objective.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AutoModeForm_Objective.cs [Design]",
+              "RelativeToolTip": "UI\\AutoModeForm_Objective.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:56:07.351Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 44,
+              "Title": "AutoModeForm.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AutoModeForm.cs",
+              "RelativeDocumentMoniker": "UI\\AutoModeForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AutoModeForm.cs [Design]",
+              "RelativeToolTip": "UI\\AutoModeForm.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:55:59.961Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 45,
+              "Title": "AccountsForm.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AccountsForm.cs",
+              "RelativeDocumentMoniker": "UI\\AccountsForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AccountsForm.cs [Design]",
+              "RelativeToolTip": "UI\\AccountsForm.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:55:58.811Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 47,
+              "Title": "MainForm_PredictionHook.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\MainForm_PredictionHook.cs",
+              "RelativeDocumentMoniker": "MainForm_PredictionHook.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\MainForm_PredictionHook.cs [Design]",
+              "RelativeToolTip": "MainForm_PredictionHook.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:55:53.573Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 48,
+              "Title": "MainForm.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\MainForm.cs",
+              "RelativeDocumentMoniker": "MainForm.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\MainForm.cs [Design]",
+              "RelativeToolTip": "MainForm.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T20:55:51.322Z",
+              "EditorCaption": " [Design]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 46,
+              "Title": "AccountEditDialog.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AccountEditDialog.cs",
+              "RelativeDocumentMoniker": "UI\\AccountEditDialog.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AccountEditDialog.cs [Design]",
+              "RelativeToolTip": "UI\\AccountEditDialog.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T08:03:44.581Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 50,
+              "Title": "KeyRegistry.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\KeyRegistry.cs",
+              "RelativeDocumentMoniker": "Services\\KeyRegistry.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\KeyRegistry.cs",
+              "RelativeToolTip": "Services\\KeyRegistry.cs",
+              "ViewState": "AgIAAKMAAAAAAAAAAAAAALUAAAAGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:46:45.85Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 49,
+              "Title": "AccountRegistry.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\AccountRegistry.cs",
+              "RelativeDocumentMoniker": "Services\\AccountRegistry.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\AccountRegistry.cs",
+              "RelativeToolTip": "Services\\AccountRegistry.cs",
+              "ViewState": "AgIAAF0AAAAAAAAAAAAuwGcAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:46:07.304Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 51,
+              "Title": "ProfileStore.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\ProfileStore.cs",
+              "RelativeDocumentMoniker": "Services\\ProfileStore.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\Services\\ProfileStore.cs",
+              "RelativeToolTip": "Services\\ProfileStore.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:52:09.933Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 52,
+              "Title": "MainForm_LogHook.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_LogHook.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_LogHook.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_LogHook.cs",
+              "RelativeToolTip": "UI\\MainForm_LogHook.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAACYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:35:31.432Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 53,
+              "Title": "MainForm_Tooltips.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Tooltips.cs",
+              "RelativeDocumentMoniker": "UI\\MainForm_Tooltips.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\MainForm_Tooltips.cs [Design]",
+              "RelativeToolTip": "UI\\MainForm_Tooltips.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:33:52.181Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 54,
+              "Title": "AutoModeForm.Designer.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AutoModeForm.Designer.cs",
+              "RelativeDocumentMoniker": "UI\\AutoModeForm.Designer.cs",
+              "ToolTip": "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AutoModeForm.Designer.cs",
+              "RelativeToolTip": "UI\\AutoModeForm.Designer.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAGEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-11T07:03:35.153Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

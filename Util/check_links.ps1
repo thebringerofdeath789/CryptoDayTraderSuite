@@ -1,0 +1,1 @@
+Get-ChildItem -Recurse -Filter *.md | Select-String -Pattern "\[.*?\]\((?!http)(?!mailto)(?!#)(.*?)\)" | ForEach-Object { $path = $_.Matches.Groups[1].Value.Split("#")[0]; if (-not [string]::IsNullOrWhiteSpace($path)) { $dir = Split-Path $_.Path -Parent; $target = Join-Path $dir $path; if (-not (Test-Path $target)) { Write-Warning "Missing: $path in $($_.Filename)" } } }

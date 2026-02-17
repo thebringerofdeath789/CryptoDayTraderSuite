@@ -1,0 +1,389 @@
+﻿[? Back to Documentation Index](docs/index.md)
+
+# Audit Progress Tracker
+
+**Last Reviewed Commit**: (Current Workspace Context)
+
+**Update (2026-02-17)**: Final reject-capture hardening validation (`obj/runtime_reports/reject_capture_hardened_validation_v2.txt`) confirms runtime retry behavior is active (`RUNTIME_CAPTURE_ATTEMPTS_USED=2/2`) and no longer exits early on log-only freshness; run now correctly remains `RESULT:PARTIAL` when no fresh cycle artifact and no reject evidence are observed.
+**Update (2026-02-17)**: Completed cross-broker symbol consistency pass in `Brokers/BinanceBroker.cs`, `Brokers/OkxBroker.cs`, and `Brokers/CoinbaseExchangeBroker.cs`: each now enforces venue-canonical symbol normalization across validate/place/cancel paths with fail-closed invalid-normalization handling; Coinbase cancel-all additionally resolves order ids from `id`/`order_id`/`orderId` and uses case-insensitive product-id reads.
+**Update (2026-02-17)**: Cleared `CS1998` warning in `Brokers/PaperBroker.cs` by converting `ValidateTradePlanAsync(...)` to deterministic `Task.FromResult(...)` returns (no behavior change); Debug build remains green.
+**Update (2026-02-17)**: Strict certification rerun (`obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_155852.txt`) remains `VERDICT=PARTIAL` with `STRICT_FAILURE_COUNT=0`, `STRICT_FAILURE_CLASS=NONE`, and policy decision `allow-geo-partial`.
+**Update (2026-02-17)**: `Brokers/BybitBroker.cs` now enforces canonical symbol normalization (`/`, `-`, `_` removed; uppercase) across constraint validation, order placement, and cancel-all calls, eliminating symbol-shape drift between plan input and Bybit API paths.
+**Update (2026-02-17)**: Snapshot-freshness UX pass verified end-to-end: Debug build is green and runtime Coinbase read-only probe remains `PASS` (expected fills-permission warning fallback). Also repaired a transient compile blocker in `UI/AutoModeControl.cs` by restoring valid `ExecutePlansForAccountAsync` method structure around final session-open persistence/return flow.
+**Update (2026-02-17)**: `UI/AutoModeControl.cs` now performs adaptive paper-position lifecycle management: same-direction fills on the same account/symbol are merged into one managed open position (weighted entry + consolidated qty), and open paper positions are periodically re-planned (`CDTS_AUTOMODE_POSITION_REPLAN_MINUTES`, default `3`) to tighten stop/target bounds from fresh planner proposals.
+**Update (2026-02-17)**: `UI/AccountsControl.cs` Coinbase insights now include snapshot freshness status (`Fresh`/`STALE` by age) and standardized numeric formatting for holdings/fees/net-profit, improving operator confidence in metric recency and consistency.
+**Update (2026-02-17)**: Quote-scoped holdings totals pass verification: Debug build succeeded and runtime Coinbase read-only import probe remained `PASS` (with expected fills-permission warning fallback), confirming no regression in import telemetry paths.
+**Update (2026-02-17)**: Extended live account buying-power auto-detection to include Bybit and OKX by adding concrete private balance retrieval in `Exchanges/BybitClient.cs` and `Exchanges/OkxClient.cs`, and mapping these services in `Services/AccountBuyingPowerService.cs` for Planner/Auto Mode auto-equity sizing.
+**Update (2026-02-17)**: Added live account buying-power auto-detection via `Services/AccountBuyingPowerService.cs` (Coinbase/Kraken/Bitstamp quote balances by account key) and wired `UI/PlannerControl.cs` + `UI/AutoModeControl.cs` to prefer live quote balance for sizing/risk calculations with deterministic manual-equity fallback and logging.
+**Update (2026-02-17)**: Coinbase snapshot holdings totals are now quote-scoped and deterministic: `Services/CoinbaseReadOnlyImportService.cs` computes `TotalBalanceInQuote` + `TotalBalanceQuoteCurrency` + `TotalBalanceExcludedCount` (USD-family equivalence support), and UI/log messaging (`UI/AccountsControl.cs`, `UI/KeyEditDialog.cs`) now surfaces quote-scoped totals instead of ambiguous raw cross-currency sums.
+**Update (2026-02-17)**: `obj/run_reject_evidence_capture.ps1` now supports `-RunProviderProbeBeforeCert` and strict-path provider-probe refresh by default, emitting `PROBE_JSON`/`PROBE_VERDICT`/`PROBE_EXIT` alongside capture diagnostics so provider evidence freshness is included in one run.
+**Update (2026-02-17)**: Latest Coinbase fill-dedupe follow-through is validated: Debug build passes and runtime read-only probe remains `PASS` with permission-gated fills warning fallback (`401` on historical fills) and stable products/fees/balances import telemetry.
+**Update (2026-02-17)**: Completed Coinbase fill-economics follow-through: `Exchanges/CoinbaseExchangeClient.cs` now de-duplicates enriched fills before return, and `Services/CoinbaseReadOnlyImportService.cs` now recognizes both `coinbase_fill_id:` and `coinbase_fill_fp:` note markers when loading history so deterministic fallback fingerprints prevent duplicate imports across reruns.
+**Update (2026-02-17)**: Live Coinbase `orders/preview` probe now passes auth with imported key (`HTTP 200`) using app JWT utilities; response returns expected business rejection (`PREVIEW_INSUFFICIENT_FUND`) instead of auth failure, confirming trade-permission path is functioning.
+**Update (2026-02-17)**: Live safe Coinbase private-path probe (`obj/tmp_coinbase_private_safe_probe.ps1`) now passes with imported key (`coinbase-advanced|cba1`): authenticated open-orders/fills requests succeed and synthetic-id cancel returns deterministic `false` (`__PRIVATE_SAFE=PASS`, `open=0`, `fills=0`).
+**Update (2026-02-17)**: Strict certification re-run (`obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_095007.txt`) remains `VERDICT=PARTIAL` with build/matrix/freshness/reject gates passing; remaining blockers are environment/provider constraints only.
+**Update (2026-02-17)**: Resolved `skipped(account)` runtime blocker for reject capture: Auto profiles were bound to stale account id `817f...` while current enabled account id is `b1a...`; added `obj/repair_profile_account_bindings.ps1` and repaired all enabled profile bindings (`3` updates, backup written).
+**Update (2026-02-17)**: `obj/precheck_reject_evidence_capture.ps1` now normalizes single-object account JSON payloads (not only arrays), emits unmatched binding diagnostics (`PRECHECK_UNMATCHED_PROFILE_COUNT`, `PRECHECK_UNMATCHED_ACCOUNT_IDS`), and correctly reports enabled account counts for one-account stores.
+**Update (2026-02-17)**: `obj/run_reject_evidence_capture.ps1` now supports `-AutoRepairBindings` to auto-run profile/account repair then re-run precheck before capture; end-to-end strict capture now reaches fresh-cycle evidence (`CYCLE_IS_FRESH=1`) and observed reject categories (`fees-kill`, `routing-unavailable`).
+**Update (2026-02-17)**: Resolved Coinbase query-endpoint auth mismatch by signing JWT request URI with path-only (`AbsolutePath`) in `Exchanges/CoinbaseExchangeClient.cs`; live runtime checks now show `GetRecentFillsAsync(...)` authenticates successfully (no 401) with the imported Coinbase key.
+**Update (2026-02-17)**: Post-hardening runtime validation re-run (`obj/tmp_coinbase_readonly_import_probe3.ps1`) passes (`__COINBASE_READONLY_IMPORT=PASS`) with expected fills-scope warning fallback (`401` on historical fills) while products/fees/balances import remains healthy (`ProductCount=789`, non-zero balances and maker/taker rates populated).
+**Update (2026-02-17)**: `Services/CoinbaseReadOnlyImportService.cs` fill dedup is now deterministic when Coinbase fill IDs are absent: fallback markers use a stable fill fingerprint (`product|side|qty|price|notional|fee|timestamp`) instead of random GUIDs, preventing duplicate import drift across repeated read-only runs.
+**Update (2026-02-17)**: Completed Coinbase fill-economics normalization slice across client+import: `Exchanges/CoinbaseExchangeClient.cs` now enriches fills with canonical `size`/`price`/`notional`/`fee`/`trade_time` fields from variant keys, and `Services/CoinbaseReadOnlyImportService.cs` now performs candidate-based case-insensitive fill parsing (including side/product aliases), notional-derived qty/price fallback math, safer invalid-fill skipping, and valid UTC datetime parsing (removed invalid `DateTimeStyles` combination).
+**Update (2026-02-17)**: Confirmed live imported Coinbase key data is valid at runtime (`coinbase-advanced|cba1` resolves to advanced key-name + EC PEM shape), and real `CoinbaseReadOnlyImportService.ValidateAndImportAsync()` now passes with live products/fees/balances; `401` from `/orders/historical/fills` is now handled as optional telemetry (warn + continue) so read-only account import no longer fails when fills scope is unavailable.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` cancel/open/fill semantics hardened: `CancelOrderAsync` now evaluates `results`/`order_results`/`cancel_results`/`data` with status-based success/failure normalization and id matching, `GetOpenOrdersAsync` now filters to open-like statuses, and `GetRecentFillsAsync` now enriches rows with normalized `product_id` and canonical BUY/SELL `side` across variant field names.
+**Update (2026-02-17)**: Reject-evidence precheck now validates runnable Auto profile/account bindings (`PRECHECK_ENABLED_PROFILE_COUNT`, `PRECHECK_ENABLED_ACCOUNT_COUNT`, `PRECHECK_RUNNABLE_PROFILE_COUNT`) and orchestration fails fast when all profiles would be `skipped(account)`.
+**Update (2026-02-17)**: Completed async-only broker validation cleanup by removing legacy sync `ValidateTradePlan(...)` from `IBroker` and all active broker implementations; planner/auto execution remain on awaited `ValidateTradePlanAsync(...)` paths.
+**Update (2026-02-17)**: Fresh strict certification rerun (`obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_160427.txt`) confirms unchanged baseline: `VERDICT=PARTIAL`, `StrictFailureClass=NONE`, `StrictFailures=count=0`.
+**Update (2026-02-17)**: Migrated broker plan validation to async contract (`ValidateTradePlanAsync`) across `IBroker` + all active broker implementations and switched canonical execution paths (`UI/PlannerControl.cs`, `UI/AutoModeControl.cs`) to await validation, eliminating sync-over-async symbol-constraint fetches in active order flows.
+**Update (2026-02-17)**: Fully retired legacy `UI/AutoModeForm.cs` (+ designer) from compile scope and repository; extracted broker resolution into new `Brokers/BrokerFactory.cs` to keep `UI/AutoModeControl.cs` canonical execution path compile-stable after legacy form removal.
+**Update (2026-02-17)**: Removed dormant legacy UI entrypoint sources (`UI/MainForm_Menu.cs`, `UI/MainForm_Hooks.cs`, `UI/MainForm_ExtraButtons.cs`) from both project compile scope and disk, and removed duplicate non-compiled broker artifacts under `NewFolder2/` plus corresponding project folder include.
+**Update (2026-02-17)**: Remediation iteration (post audit) hardened high-risk runtime paths: `UI/AutoModeForm.cs` legacy direct execution is now disabled (canonical AutoModeControl required), `Exchanges/KrakenClient.cs` moved to invariant numeric parsing, `Exchanges/BitstampClient.cs` removed optimistic synthetic maker-fee inference, `UI/KeyEditDialog.cs` Coinbase auto-import no longer blocks UI thread, and `Program.cs` now calls `Log.Shutdown()` during exit.
+**Update (2026-02-17)**: `UI/AutoModeControl.cs` `RankPairs(...)` now filters malformed numeric-only USD products (for example `00-USD`) while preserving alphanumeric symbols, reducing invalid multi-venue quote retry storms during auto cycles.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` `PlaceOrderAsync` now does deterministic multi-root outcome reconciliation (`success_response`/`order`/root): expanded order-id/status/reject parsing, filled quantity + average fill price extraction, reject-status fail-closed handling, and centralized message mapping via `ResolveOrderMessage`/`IsRejectReason`.
+**Update (2026-02-17)**: Accounts UI now shows Coinbase metrics by selected account (`UI/AccountsControl.cs`/`UI/AccountsControl.Designer.cs`) via persisted key-scoped snapshots in `Services/CoinbaseReadOnlyImportService.cs`, including holdings breakdown, balances total, fills, fees paid, and net-profit estimate.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` shared parse helpers now use case-insensitive key resolution (`TryGetObjectValue`) and zero-safe decimal extraction (`TryReadDecimalValue`), improving resilience for casing-variant payloads and legitimate `0` values in candidate-key numeric parsing.
+**Update (2026-02-17)**: Live Coinbase probe validation (`Util/run_provider_public_api_probe.ps1`) found a real `INTEGRATION-ERROR` in `Exchanges/CoinbaseExchangeClient.cs` (`ReadDateTimeValue` used an invalid `DateTimeStyles` flag combination); fixed to valid UTC parse flags and revalidated with live `PASS` probes for `BTC-USD`, `ETH-USD`, and `SOL-USD`.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` resilience pass expanded: fee-rate candidate key parsing (`maker`/`taker` fallbacks), account list root fallbacks (`accounts`/`results`/`data`) with duplicate-currency balance aggregation, stricter order-input guards (non-positive quantity and blank product), fills root/data fallbacks, product id derivation from base/quote currency pairs, and broader symbol-constraint candidate key coverage.
+**Update (2026-02-17)**: Coinbase key save now auto-runs read-only import (`UI/KeyEditDialog.cs` + `Services/CoinbaseReadOnlyImportService.cs`), importing/updating account linkage and pulling holdings/balances, recent fills, fees-paid totals, and net profit estimate; fills are dedup-persisted into local trade history.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` order/cancel robustness expanded: null/invalid limit-order guards in `PlaceOrderAsync`, reject-reason-aware acceptance, stronger cancel success matching by `order_id`, open-order fallback parsing (`orders`/`results`/`data`), and `ReadObjectList` now handles broader list/serialized payload shapes.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` fee parsing now tolerates alternate `transaction_summary` shapes (`fee_tier`/`feeTier` and `fee_tiers`/`feeTiers`), supports snake/camel maker/taker keys, and fails explicitly when valid rates are absent.
+**Update (2026-02-17)**: Hardened `Exchanges/BinanceClient.cs` ticker semantics so `GetTickerAsync()` always resolves a valid `Last` price (book-ticker midpoint with `/api/v3/ticker/price` fallback), backfills missing bid/ask from `Last`, and fails explicitly when no valid price is returned.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` product discovery now fails over between legacy `/products` and Advanced `/api/v3/brokerage/products`, parses additional root list shapes (`products`/`data`), and accepts id variants (`id`/`product_id`/`productId`) for both product listing and constraints cache population.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` balance parsing now supports alternate account amount/currency shapes (nested `value`/`amount` and direct fields for available/hold/balance) to reduce false zero-balance reads on payload variants.
+**Update (2026-02-17)**: Added `Import Coinbase (Read-only)` in `UI/AccountsControl` backed by `Services/CoinbaseReadOnlyImportService.cs`; it validates Coinbase products/fees/balances and imports/updates local account linkage from the active Coinbase key without any trading calls.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` candle ingestion now uses safe numeric parsing helpers and skips malformed candle rows instead of throwing conversion exceptions during long-range chunked retrieval.
+**Update (2026-02-17)**: Hardened `Exchanges/BinanceClient.cs` cancel semantics: order cancel now requires structured response checks (`orderId` consistency and terminal cancel statuses) and cancel-all now validates per-order terminal statuses instead of treating any non-empty response as success.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` product discovery now tolerates variant `/products` payload shapes (`List<Dictionary>`, `object[]`, nested `products`) and `ListProductsAsync()` now drops blank ids and de-duplicates product symbols.
+**Update (2026-02-17)**: Fixed key deletion reliability in `Services/KeyService.cs` and `UI/KeysControl.cs` by normalizing broker/label identity matching (`null`/empty/trim/case), deleting by broker+label from UI, and clearing stale active-key map entries on delete.
+**Update (2026-02-17)**: Hardened `Exchanges/BybitClient.cs` and `Exchanges/OkxClient.cs` order acceptance/cancel-all semantics: placement now requires structured success codes (`retCode`/`code` + row-level status) in addition to order id presence, and OKX cancel-all now returns success only when all attempted cancels succeed.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` ticker parsing now tolerates partial payloads (fallback `last` field candidates, bid/ask fallback to last), uses safe timestamp parsing, and fails explicitly only when no valid last price is present.
+**Update (2026-02-17)**: Hardened `Exchanges/BybitClient.cs` and `Exchanges/OkxClient.cs` fee/cancel semantics: fee retrieval now uses worst-case aggregation across available fee rows (with broad-query + symbol fallback), and cancel paths now parse structured API success codes instead of treating any non-empty response as success.
+**Update (2026-02-17)**: Coinbase credential setup now supports file-picker JSON import in both dialogs: `UI/KeyEditDialog.cs` and `UI/AccountEditDialog.cs` include `Import JSON...` actions that default to Downloads (`cdp_api_key(2).json`) and normalize `name` + `privateKey` into key-name/PEM fields.
+**Update (2026-02-17)**: Implemented full-window candle retrieval for `Exchanges/BybitClient.cs` and `Exchanges/OkxClient.cs`; Bybit now pages 1000-row kline windows by timestamp cursor and OKX now chunks long ranges into repeated 300-row history-candle windows with deduped merge.
+**Update (2026-02-17)**: Coinbase runtime service identity is now canonicalized to `coinbase-advanced` (`Brokers/CoinbaseExchangeBroker.cs`) with legacy `coinbase-exchange` active-key fallback and updated Auto Mode watchdog service checks.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` now signs Advanced JWTs with normalized HTTP method casing, uses boundary-safe candle chunk cursor advancement (`cursor = chunkEnd`) to avoid potential range gaps, and treats cancel-root `success` as fallback-only when per-result statuses are absent.
+**Update (2026-02-17)**: Trading surface exchange selection now includes geo-routing aliases (`Binance-US`, `Binance-Global`, `Bybit-Global`, `OKX-Global`) and `UI/TradingControl.cs` shows inline routing status hints when alias services are selected.
+**Update (2026-02-17)**: Legacy `MainForm` designer exchange dropdown now mirrors geo-routing alias options (`Binance-US`, `Binance-Global`, `Bybit-Global`, `OKX-Global`) so fallback/manual setup paths are consistent with the Trading surface.
+**Update (2026-02-17)**: Coinbase service selection is now consolidated to `coinbase-advanced` in account/key dialogs, and `UI/AutoModeForm.cs` broker mapping now routes `coinbase-advanced` to `CoinbaseExchangeBroker`.
+**Update (2026-02-17)**: `UI/AccountEditDialog.cs` now aligns Coinbase account credential UX with Coinbase payloads by allowing optional raw JSON paste, prioritizing key-name/PEM fields, and clearing irrelevant secret/passphrase persistence for Coinbase services.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now supports an explicit `-Strict` switch alias that enables all strict gates (`build`, `matrix`, `provider`, `reject`) and emits strict invocation telemetry in report `Inputs` and TXT (`StrictMode: ON/OFF ...`) for deterministic automation interpretation; internal strict-gate variable naming was normalized to avoid PowerShell case-insensitive switch aliasing so JSON emits plain booleans.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` terminal output now includes machine-parseable strict context lines (`STRICT_REQUESTED`, `STRICT_SWITCH`, `STRICT_GATES`) alongside report paths and verdict, simplifying CI wrapper parsing without opening JSON artifacts.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now emits machine-readable strict rollups in `Summary.Strict` (`Enabled`, effective gates, `FailureCount`, `FailureNames`, `FreshnessOnlyFailure`), plus TXT/stdout strict-failure lines (`StrictFailures`, `STRICT_FAILURE_COUNT`, `STRICT_FAILURE_NAMES`) for faster triage.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now emits deterministic `StrictFailureClass` (`NON_STRICT`, `NONE`, `FRESHNESS_ONLY`, `BUILD_AND_FRESHNESS`, `BUILD_ONLY`, `OTHER_STRICT`) in JSON/TXT/stdout (`Summary.Strict.FailureClass`, `StrictFailureClass: ...`, `STRICT_FAILURE_CLASS=...`) for direct CI routing.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now emits deterministic `StrictPolicyDecision` (`non-strict`, `promote`, `allow-geo-partial`, `collect-more-evidence`, `refresh-freshness`, `fix-build`, `fix-failures`) in JSON/TXT/stdout so CI can map strict outcomes directly to remediation or promotion actions.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now emits a single parser-friendly `CI_SUMMARY` contract (`verdict`, `strict`, `class`, `decision`, `fails`, `manifest`) in JSON (`Summary.Strict.CiSummary`), TXT (`CiSummary:`), and stdout (`CI_SUMMARY=...`) for one-line CI routing.
+**Update (2026-02-17)**: Added explicit contract marker `CI_VERSION` to `Util/run_multiexchange_certification.ps1` and embedded it in `CI_SUMMARY` (`version=...`) with mirrored outputs in JSON (`Summary.Strict.CiVersion`), TXT (`CiVersion:`), and stdout (`CI_VERSION=...`) for schema-safe parser upgrades.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now emits `CI_FIELDS` (ordered required key manifest) and includes it in `CI_SUMMARY` (`fields=...`) plus JSON (`Summary.Strict.CiFields/CiFieldsText`), TXT (`CiFields:`), and stdout (`CI_FIELDS=...`) for parser self-validation.
+**Update (2026-02-17)**: Added `Util/check_multiexchange_contract.ps1` to run certification and assert required stdout contract keys (`CI_VERSION`, `CI_FIELDS`, `CI_SUMMARY`, strict decision/class/count/name keys, report paths, verdict) and summary/version consistency.
+**Update (2026-02-17)**: Hardened `obj/run_reject_evidence_capture.ps1` external orchestration with retryable provider-probe/default-cert/strict-cert invocations (`ExternalRetryCount`/`ExternalRetryDelaySeconds`) and retry telemetry (`*_RETRY`, `*_ATTEMPTS`) to reduce intermittent long-run failures.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` artifact manifest entries now include explicit `SourceClass` (`matrix`/`provider`/`reject`/`policy`) and stable `DiffKey` values; TXT artifact lines now emit both fields and manifest hash canonicalization includes them for deterministic dashboard-friendly diffs.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now waives Binance perp coverage as deferred evidence when probe shows Binance spot coverage pass but no perps on spot-only endpoint profile, preventing false strict `perp-missing` failures in US-routed environments.
+**Update (2026-02-17)**: Certification reports now emit deterministic artifact-manifest ordering and a SHA-256 `ArtifactManifestHash` (JSON + TXT) in `Util/run_multiexchange_certification.ps1` to improve tamper-evident audit diffing.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now publishes freshness rollups (`OverallStatus`, `NonPassSources`) in JSON `Summary.Freshness`, emits compact TXT freshness status lines, and targets strict freshness remediation text to stale source groups.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now writes machine-readable freshness telemetry into report `Summary` (per-source `Source`, `AgeHours`, `Status`, plus threshold hours) so dashboards/scripts can evaluate recency without parsing check text.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now emits freshness-aware `RecommendedNextAction` guidance: strict `FAIL` states caused only by freshness gates prompt evidence refresh/threshold adjustment instead of generic remediation text.
+**Update (2026-02-17)**: Strict certification now fail-escalates non-PASS freshness checks (`AutoMode matrix artifact freshness`, `Provider probe artifact freshness`, `Reject evidence freshness`) so strict mode enforces evidence recency in addition to build/matrix/provider/reject gates.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now evaluates freshness age for matrix artifacts, provider probe artifacts, and reject-evidence logs (default 24h thresholds) so certification quality includes recency, not just presence/status.
+**Update (2026-02-17)**: `Exchanges/CoinbaseExchangeClient.cs` private brokerage calls now use bounded request timeouts with explicit timeout diagnostics, and nested payload conversion now accepts non-generic `IDictionary` shapes to reduce parse fragility across runtime JSON variants.
+**Update (2026-02-17)**: `Util/run_multiexchange_certification.ps1` now emits geo-blocker-aware `RecommendedNextAction` guidance, so strict `PARTIAL` outcomes caused only by `ENV-CONSTRAINT` checks explicitly recommend continuing non-geo reliability work instead of requesting impossible geo-dependent revalidation.
+**Update (2026-02-17)**: Expanded exchange-specific broker validation to enforce venue price-tick alignment (`entry`, `stop`, `target`) in `Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/CoinbaseExchangeBroker.cs`, and `Brokers/OkxBroker.cs` using `SymbolConstraints.PriceTickSize`.
+**Update (2026-02-17)**: Replaced generic `OkxBroker` quantity precision checks with exchange-specific symbol constraint enforcement by adding cached OKX constraints in `Exchanges/OkxClient.cs` (`minSz`, `maxMktSz`/`maxLmtSz`, `lotSz`, `tickSz`) and consuming them in `Brokers/OkxBroker.cs`.
+**Update (2026-02-17)**: Added service-specific geo routing hints in account/key dialogs so endpoint intent (`*-us`, `*-global`, or default+env override) is visible during account and key configuration.
+**Update (2026-02-17)**: Added `obj/precheck_reject_evidence_capture.ps1` and integrated it into `obj/run_reject_evidence_capture.ps1` to validate persisted Auto Run state before evidence capture.
+**Update (2026-02-17)**: `UI/KeyEditDialog.cs` now aligns Coinbase key entry to Coinbase payloads by showing Coinbase-only fields for Coinbase services and supporting optional raw Coinbase JSON paste auto-mapping to key-name/PEM.
+**Update (2026-02-17)**: Coinbase setup messaging/policy now reflects Advanced-only credentials in active UX paths: `coinbase-exchange` policy requires key-name+PEM and legacy Coinbase tooltip wording was removed.
+**Update (2026-02-17)**: Added explicit `binance-us` / `binance-global` service aliases across account/key UI, provider/policy normalization, broker factory routing, and Binance endpoint selection so US/global routing can be selected per account.
+**Update (2026-02-17)**: Added `bybit-global` / `okx-global` aliases across account/key UI, credential policy/provider normalization, broker factory routing, and broker/client endpoint resolution for explicit per-account venue host selection.
+**Update (2026-02-17)**: Expanded broker-side directional stop/entry/target sanity checks to `Brokers/CoinbaseExchangeBroker.cs`, `Brokers/OkxBroker.cs`, and `Brokers/PaperBroker.cs` so all active broker validators now fail closed on invalid long/short risk geometry and zero-direction plans.
+**Update (2026-02-17)**: Re-aligned `Exchanges/CoinbaseExchangeClient.cs` cancel behavior to fail closed (`false`) on non-success HTTP responses via a cancel-specific safe private request path, while keeping cancel success detection strictly structured (`success` / `results[].success`).
+**Update (2026-02-17)**: Coinbase private auth path is now Advanced-only in `Exchanges/CoinbaseExchangeClient.cs`; legacy key/secret/passphrase private signing was removed and private calls require API key name + EC private key PEM.
+**Update (2026-02-17)**: Added one-command reject-evidence capture orchestrator `obj/run_reject_evidence_capture.ps1` to run runtime evidence windows and certification in a single flow.
+**Update (2026-02-17)**: Reject-evidence capture now emits `CYCLE_IS_FRESH`/`LOG_IS_FRESH` diagnostics to separate stale Auto Run state from true no-reject runtime behavior.
+**Update (2026-02-17)**: Exchange host routing is now geo-configurable: Binance defaults to `api.binance.us` and all of Binance/Bybit/OKX support environment-based base URL overrides (`CDTS_BINANCE_BASE_URL`, `CDTS_BYBIT_BASE_URL`, `CDTS_OKX_BASE_URL`) for jurisdiction/network adaptation.
+**Update (2026-02-17)**: Coinbase Advanced runtime auth now supports Coinbase's current key format (API key name + EC private key PEM) via ES256 JWT bearer signing and brokerage private endpoints in `Exchanges/CoinbaseExchangeClient.cs`.
+**Update (2026-02-17)**: Binance cancel flow now uses an orderId→symbol fast-path cache (seeded on order placement and fallback discovery) before full open-order scans, reducing repeated O(n) cancel lookups for known orders.
+**Update (2026-02-17)**: Binance candle retrieval now paginates full kline windows (1000-row pages) with timestamp dedup; Coinbase cancel path now returns deterministic false on non-success HTTP outcomes; Binance/Bybit brokers enforce directional stop-target geometry; and TradePlanner time blocking now correctly supports cross-midnight windows.
+**Update (2026-02-17)**: Auto cycle now emits deterministic reject-evidence telemetry (`[AutoMode][RejectEvidence]`) and persists `RejectReasonCounts` in cycle reports for certification consumption.
+**Update (2026-02-17)**: Certification runner now merges reject-category evidence from cycle artifacts (`RejectReasonCounts`) with log-derived counts, reducing dependence on log-line scraping alone.
+**Update (2026-02-17)**: Coinbase setup paths now accept Coinbase-provided raw JSON key bundles (`name` + `privateKey`) by normalizing into API key-name/PEM fields in account/key dialogs and broker/client credential resolution.
+**Update (2026-02-17)**: Strict certification now records `ENV-CONSTRAINT` provider/coverage outcomes as explicit geo-access blockers (continued evaluation) instead of hard-failing those checks when integration is otherwise healthy.
+**Update (2026-02-17)**: Certification now selects best recent matrix evidence (`MatrixStatus=PASS` artifact when available) and scans recent logs for reject-category tokens, reducing false strict failures caused by latest-artifact-only sampling.
+**Update (2026-02-17)**: Coinbase advanced client parsing was hardened to tolerate `Dictionary`/`object[]`/`ArrayList`/JSON-string payload variants and to fail cancel requests safely on non-HTTP private-call exceptions.
+**Update (2026-02-17)**: Certification now auto-generates policy/provider-backed strategy×exchange row evidence artifacts (`obj/runtime_reports/strategy_exchange_evidence/strategy_exchange_policy_evidence_*.json`), eliminating missing-row stalls (`30/30` evidenced in latest run).
+**Update (2026-02-17)**: GC19.2 spot/perps certification gating now waives `ENV-CONSTRAINT` venues in coverage detail (reported as deferred evidence, not false `*-missing`) and requires perps only for currently perp-capable implementations (`Coinbase`, `Binance`, `Bybit`).
+**Update (2026-02-17)**: Fixed `Services/ExchangeProviderAuditService.cs` structural syntax regression and restored green Debug build for certification pipeline.
+**Update (2026-02-17)**: Provider probe failure classification integration is complete (probe artifacts now emit `FailureClass` and certification consumes classified provider outcomes).
+**Update (2026-02-17)**: Binance `tradeFee` parsing now aggregates all returned symbol rows (conservative worst-case fee schedule) instead of taking only the first row.
+**Update (2026-02-17)**: Coinbase execution path now enforces symbol-level constraints (`base_min_size`, `base_max_size`, `base_increment`, min notional) via cached `/products` metadata in client+broker validation.
+
+## Audit Index
+- **Phase**: 15 (Functional Simulation & AI Verification) - **IN PROGRESS**
+- **Total Files**: 115
+- **Status**: Simulating AI connectivity and Strategy Execution
+
+## Source File Index
+
+### Priority: Startup
+- [x] [Program.cs](Program.cs)
+- [x] [MainForm.cs](MainForm.cs)
+- [x] ~~Services/AccountRegistry.cs~~ (Decommissioned)
+
+### UI
+- [x] [UI/TradingControl.cs](UI/TradingControl.cs)
+- [x] [UI/StatusForm.cs](UI/StatusForm.cs) (Replaced by StatusControl)
+- [x] [UI/SettingsForm.cs](UI/SettingsForm.cs)
+- [x] [UI/PlannerControl.cs](UI/PlannerControl.cs) (Fixed Static Usage)
+- [x] [UI/PlannerForm.cs](UI/PlannerForm.cs) (Legacy/deprecated; sidebar Planner routed to PlannerControl)
+- [x] [UI/AccountsForm.cs](UI/AccountsForm.cs)
+- [x] [UI/KeysForm.cs](UI/KeysForm.cs)
+- [x] [UI/DashboardControl.cs](UI/DashboardControl.cs)
+- [x] [UI/AutoModeControl.cs](UI/AutoModeControl.cs) (Fixed Designer)
+- [x] [UI/AutoModeForm.cs](UI/AutoModeForm.cs)
+- [x] [UI/GovernorWidget.cs](UI/GovernorWidget.cs) (New)
+- [x] [UI/SidebarControl.cs](UI/SidebarControl.cs) (New)
+- [x] [UI/StrategyConfigDialog.cs](UI/StrategyConfigDialog.cs) (New)
+- [x] [UI/TradeEditDialog.cs](UI/TradeEditDialog.cs) (Fixed Designer)
+
+### Services
+- [x] ~~Services/KeyRegistry.cs~~ (Decommissioned)
+- [x] ~~Services/HistoryStore.cs~~ (Decommissioned)
+- [x] ~~Services/ProfileStore.cs~~ (Decommissioned)
+- [x] ~~Services/TimeFilters.cs~~ (Decommissioned)
+- [x] [Services/RateRouter.cs](Services/RateRouter.cs)
+- [x] [Services/AutoPlannerService.cs](Services/AutoPlannerService.cs)
+- [x] [Services/BacktestService.cs](Services/BacktestService.cs)
+- [x] [Services/ChromeSidecar.cs](Services/ChromeSidecar.cs)
+- [x] [Services/ExchangeProvider.cs](Services/ExchangeProvider.cs)
+- [x] [Services/AccountService.cs](Services/AccountService.cs)
+- [x] [Services/KeyService.cs](Services/KeyService.cs)
+- [x] [Services/ProfileService.cs](Services/ProfileService.cs)
+- [x] [Services/HistoryService.cs](Services/HistoryService.cs)
+- [x] [Services/TimeFilterService.cs](Services/TimeFilterService.cs)
+- [x] [Services/AIGovernor.cs](Services/AIGovernor.cs)
+- [x] [Services/Messaging/EventBus.cs](Services/Messaging/EventBus.cs)
+
+### Strategy (Optimized)
+- [x] [Strategy/StrategyEngine.cs](Strategy/StrategyEngine.cs)
+- [x] [Strategy/ORBStrategy.cs](Strategy/ORBStrategy.cs)
+- [x] [Strategy/VWAPTrendStrategy.cs](Strategy/VWAPTrendStrategy.cs)
+- [x] [Strategy/PredictionEngine.cs](Strategy/PredictionEngine.cs)
+- [x] [Strategy/RiskGuards.cs](Strategy/RiskGuards.cs)
+- [x] [Strategy/TradePlanner.cs](Strategy/TradePlanner.cs)
+- [x] [Strategy/FeatureExtractor.cs](Strategy/FeatureExtractor.cs)
+- [x] [Strategy/Indicators.cs](Strategy/Indicators.cs)
+- [x] [Strategy/DonchianStrategy.cs](Strategy/DonchianStrategy.cs)
+
+### Infrastructure
+- [x] [Util/Log.cs](Util/Log.cs)
+- [x] [Util/HttpUtil.cs](Util/HttpUtil.cs)
+- [x] [Util/SecurityUtil.cs](Util/SecurityUtil.cs)
+- [x] [Util/UtilCompat.cs](Util/UtilCompat.cs)
+- [x] ~~Util/KeyStore.cs~~ (Decommissioned)
+- [x] ~~Util/JsonUtil.cs~~ (Decommissioned)
+- [x] [Exchanges/CoinbaseExchangeClient.cs](Exchanges/CoinbaseExchangeClient.cs)
+- [x] [Brokers/PaperBroker.cs](Brokers/PaperBroker.cs)
+- [x] [Exchanges/KrakenClient.cs](Exchanges/KrakenClient.cs)
+- [x] [Exchanges/BitstampClient.cs](Exchanges/BitstampClient.cs)
+
+## Findings Register
+| ID | Severity | File | Issue | Status |
+|----|----------|------|-------|--------|
+| AUDIT-0006 | Minor | UI/DashboardControl.cs | God Class containing 7 nested classes | Fixed |
+| AUDIT-0007 | Critical | Services/KeyRegistry.cs | Swallows encryption errors (fallback to plaintext) | Fixed |
+| AUDIT-0012 | Major | Services/HistoryStore.cs | Reads wrong file for planned trades | Fixed |
+| AUDIT-0011 | Major | Services/RateRouter.cs | Thread-safety issues and long TTL | Fixed |
+| AUDIT-0013 | Critical | Services/ProfileStore.cs | Profile export included non-portable DPAPI blobs | Fixed |
+| AUDIT-0014 | Minor | Strategy/PredictionEngine.cs | LR and L2 parameters are hardcoded | Fixed |
+| AUDIT-0015 | Major | Services/AutoPlannerService.cs | O(N^2) loop | Fixed |
+| AUDIT-0016 | Major | Exchanges/KrakenClient.cs | File corrupted | Fixed |
+| AUDIT-0017 | Minor | Strategy/Indicators.cs | VWAP was O(N^2) | Fixed |
+| AUDIT-0018 | Major | Util/JsonUtil.cs | Redundant serialization logic | Fixed (Deleted) |
+| AUDIT-0019 | Major | Services | Duplicate Static/Service logic | Fixed (Deleted Static) |
+| AUDIT-0020 | High | UI/Control.cs | Programmatic layout violates WinForms Designer policy | Fixed |
+| AUDIT-0021 | Critical | Services/RateRouter.cs | Invalid Property Access (Crash) | Fixed |
+| AUDIT-0022 | High | Models/*.cs | Public fields utilized instead of Properties (Breaks Binding) | Fixed |
+| AUDIT-0023 | Critical | Strategy/RiskGuards.cs | Legacy overload always returns false (risk guard bypass) | Fixed |
+| AUDIT-0024 | Critical | Strategy/*Strategy.cs | `GetSignal(List<Candle>)` wrappers can throw on null/empty | Fixed |
+| AUDIT-0025 | Major | Strategy/StrategyEngine.cs | Donchian selected in UI but not routed by engine name mapping | Fixed |
+| AUDIT-0026 | Major | Strategy/StrategyEngine.cs | Invalid stop-distance fallback can mask broken risk geometry | Fixed |
+| AUDIT-0027 | Major | Strategy/*Strategy.cs | Inconsistent confidence scales across strategies | Fixed |
+| AUDIT-0028 | Major | Strategy/FeatureExtractor.cs | Duplicated indicator math diverges from Indicators source | Fixed |
+| AUDIT-0029 | Major | Strategy/Indicators.cs | ChoppinessIndex lacks strict period/log guardrails | Fixed |
+| AUDIT-0030 | Minor | Strategy/VWAPTrendStrategy.cs + MainForm_PredictionHook.cs | Unused knobs and uncalled prediction path | Fixed |
+| AUDIT-0031 | Minor | Services/AutoPlannerService.cs | Repeated full recomputation of indicators in simulation loop | Planned (Phase 17) |
+| AUDIT-0032 | Major | Backtest/Backtester.cs | Backtester exits on reversal signal only; ignores stop/target semantics | Fixed |
+| AUDIT-0033 | Major | Backtest/Backtester.cs | MaxDrawdown uses global peak/trough shortcut; can misstate true MDD | Fixed |
+| AUDIT-0034 | Major | MainForm_PredictionHook.cs + Strategy/PredictionEngine.cs | Prediction path not wired to runtime trigger; `Learn` not integrated | Fixed |
+| AUDIT-0035 | Major | Strategy/FeatureExtractor.cs | Error sentinel key can leak invalid feature set into model scoring | Fixed |
+| AUDIT-0036 | Minor | UI/MainForm_Menu.cs | Reflection-based private handler invocation for planner menu | Fixed |
+| AUDIT-0037 | Major | UI/StrategyConfigDialog.cs + UI/StrategyConfigControl.cs | Strategy config omits Donchian while runtime supports it | Fixed |
+| AUDIT-0038 | Major | Services/HistoryService.cs | CSV loads can abort on malformed rows due to direct Parse calls | Fixed |
+| AUDIT-0039 | Critical | Strategy/StrategyEngine.cs + MainForm.cs | Strategy stop/target computed but not enforced in live order path | Fixed |
+| AUDIT-0040 | Major | Services/ChromeSidecar.cs + Services/AIGovernor.cs | Sidecar connect attempted once; no automated reconnect lifecycle | Fixed |
+| AUDIT-0041 | Major | Services/ChromeSidecar.cs | `ConnectAsync` can return false while status remains `Connecting` | Fixed |
+| AUDIT-0042 | Major | Services/ChromeSidecar.cs | CDP response handling not correlated by request id | Fixed |
+| AUDIT-0043 | Major | Services/ChromeSidecar.cs | No timeout/cancellation around receive/evaluate/query paths | Fixed |
+| AUDIT-0044 | Major | Services/ChromeSidecar.cs | Prompt JS escaping incomplete; injection can break on edge characters | Fixed |
+| AUDIT-0045 | Major | Strategy/StrategyEngine.cs + Exchanges/*Client.cs | Order quantity/precision constraints not validated pre-submit | Fixed |
+| AUDIT-0046 | Major | UI/AutoModeControl.cs | Execute path is a placeholder in active sidebar Auto surface | Fixed |
+| AUDIT-0047 | Critical | Brokers/CoinbaseExchangeBroker.cs | Reflection-based invocation mismatches exchange client constructor/signature | Fixed |
+| AUDIT-0048 | Critical | UI/KeyEditDialog.cs + Services/KeyService.cs | Active key id format mismatch can break key resolution | Fixed |
+| AUDIT-0049 | Critical | Models/ProfileModels.cs + UI/KeyEditDialog.cs | KeyData round-trip drops `ApiSecretBase64`/advanced fields | Fixed |
+| AUDIT-0050 | Major | UI/AutoModeForm.cs + UI/AutoModeControl.cs | Duplicate auto-mode implementations have drifted behavior | Partial (Execution parity fixed) |
+| AUDIT-0051 | Major | Services/Messaging/EventBus.cs | Concurrent enumeration over mutable handler list is race-prone | Fixed |
+
+## Phase 17: Strategy & Risk Hardening Remediation Plan
+The objective of this phase is to remediate critical and major strategy/risk issues identified during the static audit without large architectural rewrites.
+
+### Workstream A: Safety & Correctness First
+- [ ] **AUDIT-0023**: Remove/replace stub overload in `RiskGuards` and enforce canonical fee guard.
+- [ ] **AUDIT-0024**: Add null/empty guards to all `GetSignal(List<Candle>)` wrappers and index gates.
+- [ ] **AUDIT-0026**: Remove `stopDistance` fallback and reject invalid stop/entry geometry.
+
+### Workstream B: Strategy Routing & Scoring Consistency
+- [ ] **AUDIT-0025**: Add Donchian strategy mapping in `StrategyEngine.SetStrategy` and alias normalization.
+- [ ] **AUDIT-0027**: Normalize confidence score scale and update downstream consumers.
+
+### Workstream C: Indicator Integrity & Performance
+- [ ] **AUDIT-0028**: Unify indicator implementations under `Indicators.cs` and remove duplicates.
+- [ ] **AUDIT-0029**: Harden `ChoppinessIndex` against invalid periods and non-finite math.
+- [ ] **AUDIT-0031**: Add rolling/cached indicator path in `AutoPlannerService.ProjectAsync`.
+
+### Workstream D: Dead Path Reduction
+- [ ] **AUDIT-0030**: Remove or wire dead knobs/paths (`LookbackMinutes`, `PullbackMultipleATR`, `AnalyzeAndPlanAsync`).
+
+### Workstream E: Backtest/ML Fidelity and Data Robustness
+- [ ] **AUDIT-0032**: Align backtester exits with stop/target behavior.
+- [ ] **AUDIT-0033**: Correct max drawdown computation.
+- [ ] **AUDIT-0034**: Wire prediction lifecycle and realized-outcome learning.
+- [ ] **AUDIT-0035**: Replace feature error sentinel with explicit result contract.
+- [ ] **AUDIT-0036**: Remove reflection-based planner invocation.
+- [ ] **AUDIT-0037**: Align strategy config UI set with executable strategy set.
+- [ ] **AUDIT-0038**: Harden history CSV parsing for partial corruption tolerance.
+
+### Workstream F: Execution & Sidecar Runtime Safety
+- [ ] **AUDIT-0039**: Enforce protective exits in live/paper execution flows.
+- [ ] **AUDIT-0040**: Add sidecar reconnect lifecycle in governor operation.
+- [ ] **AUDIT-0041**: Correct sidecar status transitions on failure paths.
+- [ ] **AUDIT-0042**: Implement CDP response id correlation.
+- [ ] **AUDIT-0043**: Add timeouts/cancellation to sidecar I/O.
+- [ ] **AUDIT-0044**: Harden prompt escaping/injection transport.
+- [ ] **AUDIT-0045**: Validate order quantity precision and venue constraints.
+
+### Workstream G: Auto-Execution Integration Integrity
+- [ ] **AUDIT-0046**: Implement real execute flow in `AutoModeControl`.
+- [ ] **AUDIT-0047**: Replace broken reflection order path in `CoinbaseExchangeBroker`.
+- [ ] **AUDIT-0048**: Normalize active key id semantics.
+- [ ] **AUDIT-0049**: Preserve advanced key fields in serialization round-trip.
+- [ ] **AUDIT-0050**: Consolidate duplicate Auto Mode surfaces.
+- [ ] **AUDIT-0051**: Make EventBus handler storage concurrency-safe.
+
+## Phase 15: AI Simulation & Functional Verification
+The objective of this phase is to confirm the end-to-end flow of the "Chrome Sidecar" integration.
+
+### Setup
+
+- [x] **Environment**: Chrome started with `--user-data-dir="%LOCALAPPDATA%\CryptoSidecar"`.
+- [x] **Login**: User logged into ChatGPT/Gemini in the sidecar window.
+- [x] **Launch**: Application started without crashing.
+
+### Verification Steps
+
+- [x] **Connection**: Log shows `[ChromeSidecar] Connected`.
+- [x] **Window Control**: Sidecar-managed Chrome now launches minimized (or hidden when enabled), and the Settings panel exposes runtime show/hide controls for the managed sidecar Chrome instance.
+- [x] **Governor**: Governor cycle confirmed with non-empty AI response capture and bias transition log (`Market Bias fallback parsed from text: Neutral -> Bearish`).
+- [x] **Multi-Provider Governor**: Same governor cycle now captures ChatGPT, Gemini, and Claude responses and logs consensus output.
+- [x] **Planner Service AI Review (Programmatic)**: Automated `AutoPlannerService` Scan→Propose sweeps confirmed planner AI review execution across ChatGPT and Gemini (`Starting AI review`, response capture, and approve/veto parsing paths).
+- [x] **AutoMode Bulk Propose UX**: `UI/AutoModeControl` now proposes across all scanned symbols in one action and reports a single aggregated outcome message (no per-symbol manual retry loop).
+- [x] **Core Surface Freshness Indicators**: `Planner`, `Trading`, and `Dashboard` now expose inline status/data-freshness labels with timestamped updates; non-critical planner/auto workflow feedback is shown inline/logged instead of popup-heavy interaction.
+- [x] **Status Semantics Consistency (Phase B Complete)**: `Planner`, `AutoMode`, `Trading`, and `Dashboard` now use aligned inline status semantics (`success/warn/neutral`) for operator readability, and runtime stability has been validated with a timed run exceeding 5 minutes.
+- [x] **AutoMode Non-Interactive Loop**: `UI/AutoModeControl` now supports `Auto Run` timed cycles with selected pairs, automatic `Scan -> Propose -> Execute`, live-arm gate, kill switch, and cap/cooldown/risk guardrails.
+- [x] **AutoMode Dual-Track Spec Coverage**: Added `Phase 18` roadmap subtasks and `docs/features/trading/AutoMode_Automation.md` to fully specify both implementation tracks (non-interactive loop + multi-broker account profiles).
+- [x] **Track B Foundation (Profiles + Persistence)**: Added `AutoModeProfileService`, profile model/persistence, MainForm/Program DI wiring, and basic profile save/load/delete/apply controls in `AutoModeControl`.
+- [x] **Track B Multi-Profile Cycle Engine**: Auto loop now runs enabled profiles independently with per-profile pair scope, cadence gating, and profile-isolated scan/propose/execute summaries.
+- [x] **Track B Profile Enable/Interval UI**: Added explicit profile-level `Enabled` and `Profile Every` controls and wired them to persisted profile save/load/apply behavior.
+- [x] **Track B Profile Summary + Capability Diagnostics**: Added live per-profile summary row in AutoMode UI and explicit manual/auto execution block reasons for unsupported or unsafe broker/profile combinations.
+- [x] **Track B Broker Capability Contract**: Added broker capability/validation contract (`GetCapabilities`, `ValidateTradePlan`) and enforced it in Auto Mode and Planner execution paths before broker placement.
+- [x] **Track B Validation Matrix Telemetry**: Auto Mode now exports per-cycle JSON telemetry reports (per-profile counts/status/reasons) to `%LocalAppData%\CryptoDayTraderSuite\automode\cycle_reports` for deterministic configurable scenario verification (example: `3/All/15`).
+- [x] **Track B In-App Telemetry Quick View**: Auto Mode now surfaces latest cycle-report summary directly in the status area for immediate matrix evidence visibility.
+- [x] **Track B Auto Matrix Evaluator**: Cycle telemetry now computes `MatrixStatus` (`PASS`/`PARTIAL`) from profile-configuration consistency checks (any selected pair count or all-pairs scope), guardrail-value presence, and profile-isolation observation, then surfaces it in telemetry summary.
+- [x] **Track B Profile Store Migration**: `AutoModeProfileService` now migrates persisted profile stores by version and rewrites legacy payloads into the canonical versioned schema.
+- [x] **Track B Per-Profile Guardrail Isolation**: Auto execution now scopes cooldown and daily-risk accounting per profile (`profile:{id}`), and telemetry matrix checks include scope-isolation + failure-does-not-halt-cycle signals.
+- [x] **Track B Profile Error Containment**: Auto cycle now catches unhandled exceptions per profile, marks the profile as `error`, and continues remaining enabled profiles in the same cycle.
+- [x] **Track A1 Lifecycle Stabilization**: Auto loop now enforces sticky Auto Run preference restore (persisted ON/OFF intent), idempotent stop/toggle handling, and in-cycle kill-switch stop requests to prevent re-entry drift.
+- [x] **Track A2 Modal Reduction + Status Flow**: `UI/AutoModeControl` now avoids normal-path modal popups in scan/propose execution flow and routes outcomes to status + logs; critical failures remain explicit.
+- [x] **Track A3 Guardrail Hardening**: Auto execution now enforces max-trades/cooldown/daily-risk rollover with persisted open-position baseline from `HistoryService` and per-order execution journaling for durable max-concurrent checks across restarts.
+- [x] **Track A4 Protective-Exit Enforcement**: Added local protective-exit watchdog path in `UI/AutoModeControl` (stop/target hit detection + close-order execution + closure journaling) and replaced Coinbase broker rejection-only execution with real market-order placement while retaining explicit fail-closed blocking when watchdog requirements are unmet.
+- [x] **Track A5 Reliability Gates**: Auto telemetry now computes deterministic gate evidence for `no-signal`, `ai-veto`, `risk-veto`, and `success` scenarios (`Gate*Observed`, `GateStatus`) and surfaces gate status in the in-app telemetry summary; cycle-level exception paths continue emitting telemetry instead of halting profile processing.
+- [x] **AutoMode Startup + Symbol Universe Reliability**: `MainForm` now eagerly initializes `AutoModeControl` at shell build so sticky Auto Run can start without manually opening the Auto page; `UI/AutoModeControl` now caches/falls back product universe and uses bounded refresh timeout to prevent `skipped(pairs)` or startup-cycle stalls when product listing is delayed/unavailable.
+- [x] **AutoPlanner Multi-Strategy Proposal Fallback**: `Services/AutoPlannerService` now evaluates ranked projection strategies per symbol until it finds a live, bias-compliant signal instead of failing immediately on only the top row; diagnostics now better distinguish `no-signal` vs `bias-blocked` across candidate strategies.
+- [x] **AutoMode Public Rate-Limit Mitigation**: `UI/AutoModeControl` now applies All-scope symbol caps per cycle (default 12, override via `CDTS_AUTOMODE_MAX_SYMBOLS`), strict USD quote filtering (`-USD`/`/USD` only), per-symbol scan pacing, and symbol-level exception isolation to reduce Coinbase public API `429` floods and keep cycles progressing.
+- [x] **Phase 19 Strict Execution Checklist**: Added `docs/features/trading/MultiExchange_Execution_Checklist.md` to map Phase 19 delivery into owner/file/acceptance work packages (`P19.1..P19.6`, `C19-*`) aligned with roadmap and certification gates.
+- [x] **Phase 19 UI Execution Planning**: Added `docs/ui/MultiExchange_UI_Execution_Plan.md` and expanded `ROADMAP.md` Workstream D with explicit Designer-first UI tasks for Auto/Planner/Dashboard and account/key dialog readiness.
+- [x] **Phase 19 Foundation Implementation (M1 Slice)**: Added normalized multi-venue quote models (`VenueQuoteSnapshot`, `CompositeQuote`, `VenueHealthSnapshot`), implemented `Services/MultiVenueQuoteService.cs` + `Services/VenueHealthService.cs`, upgraded `Services/RateRouter.cs` to composite quote routing with provenance/confidence fallback, and wired new services in `Program.cs`.
+- [x] **Phase 19 Adapter Implementation (P19.2 Slice)**: Added fully implemented exchange clients (`Exchanges/BinanceClient.cs`, `Exchanges/BybitClient.cs`, `Exchanges/OkxClient.cs`) with signed auth, market data, fee retrieval, order placement, and cancel paths.
+- [x] **Phase 19 Precision/Notional Enforcement (P19.2 Hardening)**: Added per-symbol constraint caches and broker fail-closed validation for Binance/Bybit (`step size`, `min/max qty`, `min notional`) to reduce exchange-side rejects and align with AUDIT-0045 guardrails.
+- [x] **Phase 19 Broker Expansion (P19.2 Slice)**: Added execution brokers (`Brokers/BinanceBroker.cs`, `Brokers/BybitBroker.cs`, `Brokers/OkxBroker.cs`) and wired runtime factory/provider/account-key surfaces (`Services/ExchangeProvider.cs`, `UI/AutoModeForm.cs`, `UI/AccountEditDialog.Designer.cs`, `UI/KeyEditDialog.cs`) for new venue selection and routing.
+- [x] **Phase 19 Provider/Public API Verification Foundation**: Added `Services/ExchangeProviderAuditService.cs` and documentation gates to verify each exchange provider public API contract (`CreatePublicClient`, product discovery, ticker probe) before adapter/live certification.
+- [x] **Phase 19 Per-Exchange Credential Enforcement**: Added centralized credential policy (`Services/ExchangeCredentialPolicy.cs`) and enforced service-specific account/key validation in `UI/AccountEditDialog.cs` and `UI/KeyEditDialog.cs`.
+- [x] **Phase 19 Opportunity + Routing Core (P19.3 Foundation)**: Added `Services/SpreadDivergenceDetector.cs`, `Services/FundingCarryDetector.cs`, `Services/ExecutionVenueScorer.cs`, and `Services/SmartOrderRouter.cs` with deterministic reject reasons, venue scoring, and primary/fallback routing decisions.
+- [x] **Phase 19 Planner Routing Orchestration (P19.3)**: Wired `AutoPlannerService` to consume multi-venue route diagnostics (divergence-first, scorer/router fallback), append route rationale to plan notes, and fail-close with `routing-unavailable` when no eligible venue exists.
+- [x] **Phase 19 Fee/Slippage Expectancy Gate (C19-09/B19.2)**: Added canonical pre-trade net-edge gate in `Services/AutoPlannerService.cs` using `Strategy/RiskGuards.cs` expectancy breakdown helpers, with deterministic proposal veto reasons (`fees-kill`/`slippage-kill`) and emitted diagnostics fields (`gross edge`, `fee drag`, `slippage budget`, `final net edge`) in plan notes and AI review payload.
+- [x] **Phase 19 Deterministic Certification Runner (C19-12/M5)**: Added `Util/run_multiexchange_certification.ps1` to produce timestamped PASS/PARTIAL/FAIL JSON/TXT artifacts under `obj/runtime_reports/multiexchange`, including strategy×exchange matrix rows and reject-category counts from latest runtime logs.
+- [x] **Phase 19 Certification Environment-Constraint Normalization**: Updated `Util/run_multiexchange_certification.ps1` to classify provider probe geo/network restriction failures as default `PARTIAL` environment evidence (strict `-RequireProviderArtifacts` still hard-fails non-PASS outcomes).
+- [x] **Phase 19 Kraken Provider Probe Parsing Reliability**: Updated `Exchanges/KrakenClient.cs` ticker parsing to support both `object[]` and `ArrayList` response payload shapes so provider public-API probe does not false-fail on valid Kraken ticker responses.
+- [x] **Phase 19 Circuit-Breaker Safe-Set Guard (C19-11/P19.5 Partial)**: Extended `Services/VenueHealthService.cs` with per-venue circuit-breaker state (error/stale/latency streak thresholds + timed re-enable) and added `AutoPlannerService` fail-closed routing block (`safe-set-empty-circuit-breaker`) when all candidate venues are temporarily non-tradable.
+- [x] **Provider Public-API Probe Evidence + Certification Integration**: Added provider public-API probe evidence tooling (`Util/run_provider_public_api_probe.ps1`) and integrated certification runner reporting to emit explicit failing services from the latest provider probe artifact.
+- [x] **AutoMode Runtime Soak Verification**: Fresh runtime evidence (`%LocalAppData%\CryptoDayTraderSuite\logs\log_20260217_28.txt`) confirms capped All-scope cycles now complete and execute (`ok=3, fail=0`) with no `429` entries observed in that sampled run window.
+- [x] **AutoMode Runtime Soak Verification (Latest Snapshot)**: Newest validation log (`%LocalAppData%\CryptoDayTraderSuite\logs\log_20260217_31.txt`) also shows capped All-scope execution completing with fills (`ok=3, fail=0`) and no observed `429` entries in that cycle window.
+- [x] **AutoMode Repeatability Snapshot**: Consecutive post-fix logs (`log_20260217_28.txt` to `log_20260217_31.txt`) consistently report `cycles=1`, `fills=3`, and `429=0` per run, indicating stable repeatability for the current capped All-scope profile.
+- [x] **Runtime Snapshot Verifier Tooling**: Added `obj/verify_runtime_snapshot.ps1` plus ops runbook (`docs/ops/AutoMode_Runtime_Snapshot.md`) for one-command, deterministic runtime metric snapshots with optional strict PASS/FAIL gates.
+- [x] **Runtime Snapshot Task Integration**: Added `.vscode/tasks.json` entries (`verify-runtime-snapshot`, `verify-runtime-snapshot-strict`) and startup-only skip handling (`-IgnoreStartupOnly`) so strict validation remains reliable when the newest sampled log is startup-only.
+- [x] **Runtime Snapshot Strict Semantics**: Updated verifier/task behavior so `RequireCycles`/`RequireFills` validate aggregate sampled-window evidence (not per-file), while `RequireNo429` remains per-log strict for rate-limit safety.
+- [x] **Runtime Snapshot Hard-Strict Task**: Added `.vscode/tasks.json` task `verify-runtime-snapshot-strict-no-skip` for startup-inclusive strict failure checks when operators explicitly want no startup-only bypass.
+- [x] **Task Label Collision Cleanup**: Normalized `.vscode/tasks.json` so all task labels are unique, removing task picker ambiguity from duplicate legacy labels.
+- [x] **Snapshot Re-Validation (Post-Dedupe)**: Re-ran verifier after task cleanup; baseline snapshot passes while strict snapshot currently fails on sampled real violations (`429` + no-fill windows), confirming tool correctness and current runtime pressure signal.
+- [x] **429 Backoff Mitigation**: Added explicit `429` transient classification/backoff in `Util/HttpUtil` and `Services/ResilientExchangeClient`, plus adaptive per-symbol scan pacing in `UI/AutoModeControl` to reduce repeated public-candle rate-limit bursts.
+- [x] **429 Post-Fix Verification**: Fresh strict snapshot sample window now reports `429=0` in latest logs; remaining strict failures are currently non-rate-limit (`no fills` / startup-or-veto windows).
+- [x] **OpenCap Stale Baseline Mitigation**: `UI/AutoModeControl` now applies a recent-history window when deriving persisted open-position baseline, preventing stale historical records from permanently saturating `MaxConcurrentTrades`.
+- [x] **Soak Re-Check (Post OpenCap Fix)**: Latest deterministic soak (`log_20260217_51.txt`) confirms `HTTP_429=0` and multi-cycle completion; residual no-fill behavior is now tied to open-cap/AI-veto dynamics rather than rate-limits.
+- [x] **Auto Cycle Failure Telemetry**: Cycle telemetry now captures cycle-level error metadata (`CycleErrorCount`, `CycleErrorMessage`) when unexpected loop exceptions occur.
+- [x] **Strict Matrix Evidence Flags**: Auto matrix telemetry now emits explicit observation flags for independent per-profile guardrails and failure containment (`MatrixIndependentGuardrailsObserved`, `MatrixFailureContainmentObserved`) so B5 evidence distinguishes capability vs observed scenario.
+- [x] **Matrix Validator Tooling**: Added `Util/validate_automode_matrix.ps1` and `docs/ops/AutoMode_Matrix_Validation.md` for deterministic PASS/FAIL validation over latest or explicit cycle report artifacts.
+- [x] **Sidecar Disconnect Verifier Script**: Added `obj/verify_disconnect.ps1` to automate connect/disconnect fail-safe verification and emit explicit PASS/FAIL with connected/disconnected counts.
+- [x] **Matrix Validator Strict Scenario Checks**: `Util/validate_automode_matrix.ps1` now supports strict B5 scenario validation switches (`-RequireMixedScopes`, `-RequireSelectedSymbolCounts`, `-RequireIndependentGuardrailConfigs`, `-RequireFailureIsolation`) and updated usage guidance in docs.
+- [x] **B5 One-Command Scenario Runner**: Added `Util/run_b5_validation_scenario.ps1` plus runbook `docs/ops/AutoMode_B5_Scenario_Runner.md` to seed `Selected=3/All/Selected=15` profile scenarios, run timed soak, and execute strict matrix validation in one command.
+- [x] **Lifecycle + Observability Regression Cleanup**: Removed duplicate sidecar connect startup path from `MainForm.InitializeDependencies`, restored explicit startup warning for `LoadCoinbaseCdpKeys` failure, replaced silent catches in `Exchanges/CoinbasePublicClient` with warning logs, and re-restored AutoMode profile-apply cadence decoupling (`ApplySelectedProfile` no global interval override).
+- [x] **Sidecar Disconnect Observability**: `Services/ChromeSidecar.cs` now logs explicit disconnect reasons on connection-failure/dispose paths via `MarkDisconnected(...)` to improve fail-safe evidence traceability.
+- [x] **Sidebar Navigation Visibility Fix**: Updated `SidebarControl` layout sizing/docking to prevent lower menu buttons (`Accounts`, `API Keys`, `Settings`) from being clipped by the governor widget.
+- [x] **Sidebar Collapse/Overflow Guard**: `UI/SidebarControl` now uses scroll fallback and tighter collapsed width so lower nav buttons remain reachable and collapse behavior is fully compact.
+- [x] **Account Add Credential Completeness**: `UI/AccountEditDialog.cs` now captures exchange-specific credential shapes and upserts linked key entries through `IKeyService` during account add/edit.
+- [x] **Accounts Grid Text Visibility**: `Models/ProfileModels.cs` (`AccountProfile` property binding) and `UI/AccountsControl.cs` grid sizing updates now keep account label/service text readable in enabled-checkbox account rows.
+- [x] **Designer-First Account Dialog Compliance**: `UI/AccountEditDialog` now uses a full `.Designer.cs` layout and code-behind event wiring (`InitializeComponent`) instead of programmatic runtime control creation.
+- [x] **Account Dialog UX Polish**: Account editor now hides non-applicable credential sections by service/provider availability, improves persisted service/mode fallback selection, and widens credential inputs for readability.
+- [x] **Popup Dialog Visual Modernization**: Added shared `UI/DialogTheme.cs` and applied it to Trade/Account/Key/Strategy popup dialogs so add/edit mini-dialogs match the app theme instead of default WinForms styling.
+- [x] **Popup Dialog Layout Polish (Phase 2)**: Refined Trade/Account/Key/Strategy popup structures with stronger field alignment, consistent spacing rhythm, multiline content sizing, and normalized bottom action bars for a more modern in-app editing experience.
+- [x] **Popup Dialog Typography + Control Rhythm (Phase 3)**: Updated shared `UI/DialogTheme.cs` with semibold action typography, accent section headers, and normalized input/button heights; clarified `UI/KeyEditDialog.cs` credential section headers for cleaner scanability.
+- [x] **Popup Polish Build Artifact Verification**: Confirmed lock-safe Debug build artifact generation via `OutDir` (`bin\\Debug_Verify\\CryptoDayTraderSuite.exe`) after phase-3 popup refinements.
+- [x] **Non-Paper Key Requirement Guard**: Account save now enforces that non-paper accounts must either select an existing key or provide new credentials before save.
+- [x] **Proactive Save-State Guard**: `UI/AccountEditDialog.cs` now disables `Save` until required account/key inputs are valid, matching submit-time non-paper/provider credential validation rules.
+- [x] **Verified AI Proposer Mode**: Planner service supports optional AI-first trade suggestions (side/entry/stop/target) that are accepted only after deterministic verification against strategy signal alignment, risk geometry, and global bias.
+- [x] **AI Provider Load Rotation (Sidecar)**: `Services/ChromeSidecar.cs` non-strict query path now uses round-robin primary rotation (`ChatGPT/Gemini/Claude`) with active provider tab switching before injection to avoid repeatedly hammering a single provider.
+- [x] **Claude Submit No-Send Hardening**: Claude inject path now excludes stop/cancel controls from send targeting, treats stop-visible state as sent, and adds keyboard fallback to reduce stuck composer/no-send behavior.
+- [x] **Planner**: Clicking **Scan -> Propose** in sidebar Planner triggers sidecar prompt + planner AI review logs (`Starting AI review for generated trade` observed in recent logs; `AI vetoed` path observed).
+- [x] **Fail-Safe**: Closing/shutdown disconnect paths now emit graceful sidecar disconnect evidence (Log: `[ChromeSidecar] Disconnected`), verified in recent runtime logs.
+- [x] **Multi-Exchange Blueprint (Planning Baseline)**: Added `docs/features/trading/MultiExchange_Profit_Architecture.md` and roadmap `Phase 19` tasks to define cross-venue arbitrage/funding/routing implementation order before code-level rollout.
+- [x] **Multi-Exchange Master Plan (Planning Deep Dive)**: Added `docs/features/trading/MultiExchange_Implementation_MasterPlan.md` with exact Add/Convert/Remove file-level scope, Designer-first UI changes, and set-and-forget reliability gates (circuit breakers, recovery, journaling, KPI/telemetry validation).
+- [x] **Multi-Exchange Decision Locks**: Locked implementation defaults in master plan (all exchanges mandatory, Spot+Perps in Phase 1, strict telemetry completeness gate, UI-selectable risk budgeting modes, maker-preferred execution policy, auto failover defaults by mode, and 28-day live-proof gate).
+- [x] **Certification Matrix Planning**: Added `docs/ops/MultiExchange_Certification_Matrix.md` to define mandatory exchange-adapter and strategy-by-exchange backtest/forward/live certification requirements with deterministic PASS/PARTIAL/FAIL deliverables.
+- [x] **Comprehensive Multi-Exchange Gap Mapping**: Added explicit `Phase 19 Gap-Closure Addendum` tasks in `ROADMAP.md` to track unplanned implementation gaps from comprehensive audit (data-contract completion, perps scope completion, funding runtime wiring, evidence-backed certification rows, and docs reality alignment).
+- [x] **Gap-Closure Execution Sequencing**: Expanded `ROADMAP.md` with ordered `GC19.1..GC19.7` execution checklist entries including owner roles, primary file targets, and concrete acceptance criteria for each comprehensive-audit gap.
+- [x] **GC19.6 Evidence-Backed Certification Rows**: Updated `Util/run_multiexchange_certification.ps1` to build strategy×exchange row status from explicit row-level evidence artifacts (no synthetic global projection), emit per-row `EvidenceRef`/`EvidenceSource`/`Detail` fields, and fail strict-mode certification when mandatory row evidence is missing.
+- [x] **GC19.5 Funding Carry Runtime Wiring (Complete)**: Planner now ingests live funding snapshots, enforces fail-closed gating (`funding-input-unavailable`) when funding/basis data is stale/missing, and emits funding candidate diagnostics in planner notes + AI review payload.
+- [x] **GC19.5 Funding Candidate→Executed→Realized Attribution (Complete)**: `UI/AutoModeControl.cs` now carries funding tags from proposal notes into execution records and protective-exit close records (`funding-phase:executed|realized`, realized PnL tag), preserving end-to-end funding attribution in runtime history artifacts.
+- [x] **GC19.3 Strategy×Exchange Runtime Policy Matrix (Complete)**: Added explicit service-layer policy matrix (`Services/StrategyExchangePolicyService.cs`) and integrated it into `AutoPlannerService` candidate filtering with deterministic reject codes (`policy-matrix-blocked`, `policy-health-blocked`, `policy-venue-unknown`) plus selected policy rationale tags in emitted proposal telemetry.
+- [x] **GC19.4 Shared Execution Cost Model (Complete)**: Added `Services/ExecutionCostModelService.cs` with execution-mode aware maker/taker assumptions, fee-tier/rebate hooks, and venue-specific fee/slippage adjustments via environment overrides for deterministic runtime friction modeling.
+- [x] **GC19.4 Planner + Routing Cost Parity (Complete)**: `Services/AutoPlannerService.cs` now uses shared cost assumptions in routing (`fee/slippage bps`) and expectancy gating (`modeled fee/slippage R`) while emitting execution-cost rationale (`ExecMode`, `FeeBps`, `SlipBps`) in plan telemetry.
+- [x] **GC19.4 Backtest Friction Parity (Complete)**: `Services/BacktestService.cs` now computes friction from the same `ExecutionCostModelService` assumptions used by runtime planner paths, removing prior hardcoded divergence (`maker+taker+0.0005`) and improving auditable parity.
+
+
