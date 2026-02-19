@@ -88,7 +88,7 @@ This roadmap defines the plan to bring the repository's documentation up to a pr
 - [x] **Automatic Buying-Power Detection**: Resolve live quote buying power from installed account API keys (Coinbase/Kraken/Bitstamp) and use it for Planner/Auto Mode sizing with manual fallback.
 - [ ] **Manual Simulation**: User to perform "Chrome Sidecar" live test according to `docs/ops/SIMULATION_INSTRUCTIONS.md`.
 
-## Phase 18: Auto Mode Productionization - Dual Track Implementation (Planned)
+## Phase 18: Auto Mode Productionization - Dual Track Implementation (Complete)
 Goal: fully implement unattended Auto Mode behavior without placeholders or partial paths, across both single-session automation and multi-broker/account segmentation.
 
 ### Track A - Non-Interactive Auto Loop Completion (Single Session)
@@ -119,52 +119,52 @@ Goal: fully implement unattended Auto Mode behavior without placeholders or part
 	- [x] Tighten protective stop/target bounds when refreshed plans improve risk geometry.
 
 ### Track B - Multi-Broker / Multi-Account Pair Scope Orchestration
-- [ ] **B1. Introduce Auto Profiles (Per Account/Broker)**
+- [x] **B1. Introduce Auto Profiles (Per Account/Broker)**
 	- [x] Define persisted profile model: `ProfileId`, `AccountId`, `Enabled`, `PairScope` (`All|Selected`), `SelectedPairs`, cadence/risk overrides.
 	- [x] Add versioned persistence file with migration for missing/new fields.
 	- [x] Validate profile-account binding and fail closed on missing/disabled account.
-- [ ] **B2. Build Auto Profile Management UX (Designer-First)**
+- [x] **B2. Build Auto Profile Management UX (Designer-First)**
 	- [x] Add profile list with add/edit/delete/enable toggles in `AutoModeControl` designer-backed UI.
 	- [x] Add profile editor interactions for pair scope (`All` vs custom checked set).
 	- [x] Add per-profile summary row (broker, account label, pair count, mode, risk caps).
-- [ ] **B3. Multi-Profile Cycle Engine**
+- [x] **B3. Multi-Profile Cycle Engine**
 	- [x] Execute cycles per enabled profile in a stable deterministic order.
 	- [x] Resolve symbols per profile (`All` products at runtime or explicit selected list).
 	- [x] Isolate queue/proposal/execution state by profile (no cross-profile bleed).
 	- [x] Aggregate cycle telemetry by profile and global summary.
-- [ ] **B4. Broker Routing & Capability Contract**
+- [x] **B4. Broker Routing & Capability Contract**
 	- [x] Route execution strictly by account service/mode through `BrokerFactory`.
 	- [x] Add capability checks per broker (supports market entry, supports protective exits, precision rules).
 	- [x] Block unsupported broker/profile combinations with explicit actionable diagnostics.
-- [ ] **B5. End-to-End Validation Matrix**
+- [x] **B5. End-to-End Validation Matrix**
 	- [x] Add deterministic telemetry export artifact for matrix verification (`cycle_reports/*.json`).
 	- [x] Add automatic matrix evaluator (`PASS|PARTIAL`) inside cycle telemetry for profile-configured pair scopes/counts + isolation checks.
 	- [x] Extend matrix validator tooling with strict scenario switches (`-RequireMixedScopes`, `-RequireSelectedSymbolCounts`, `-RequireIndependentGuardrailConfigs`, `-RequireFailureIsolation`).
 	- [x] Add one-command B5 scenario runner (`Util/run_b5_validation_scenario.ps1`) to seed mixed-scope profiles and execute strict matrix validation.
-	- [ ] Validate configurable scenario in one run (example: `3 pairs on Broker A`, `All pairs on Broker B`, `15 pairs on Broker C`).
-	- [ ] Validate independent caps/cooldowns/risk budgets per profile.
-	- [ ] Validate one failing profile does not stop other profiles from completing cycle.
+	- [x] Validate configurable scenario in one run (example: `3 pairs on Broker A`, `All pairs on Broker B`, `15 pairs on Broker C`).
+	- [x] Validate independent caps/cooldowns/risk budgets per profile.
+	- [x] Validate one failing profile does not stop other profiles from completing cycle.
 
 ### Phase 18 Definition of Done (Mandatory)
-- [ ] No scaffolding methods, no placeholder comments, no `NotImplementedException`, no simplified stub behavior in production paths.
-- [ ] All new UI surfaces are Designer-backed and editable in Visual Studio.
-- [ ] All feature behavior is documented in `docs/features/trading/AutoMode_Automation.md` and indexed in `docs/index.md`.
-- [ ] `docs/CHANGELOG.md` and `PROGRESS_TRACKER.md` updated with implementation and verification results for each completed subtask.
-- [ ] Build passes (`Debug`) with no new compile errors and no regression in existing auto/planner workflows.
+- [x] No scaffolding methods, no placeholder comments, no `NotImplementedException`, no simplified stub behavior in production paths.
+- [x] All new UI surfaces are Designer-backed and editable in Visual Studio.
+- [x] All feature behavior is documented in `docs/features/trading/AutoMode_Automation.md` and indexed in `docs/index.md`.
+- [x] `docs/CHANGELOG.md` and `PROGRESS_TRACKER.md` updated with implementation and verification results for each completed subtask.
+- [x] Build passes (`Debug`) with no new compile errors and no regression in existing auto/planner workflows.
 
 ## Phase 16: Deployment & Maintenance (Future)
 - [ ] **Release Build**: create Release configuration artifacts.
 - [ ] **Installer**: create simple zip/setup.
 
 ## Phase 17: Strategy & Risk Hardening Audit Remediation (Planned)
-- [ ] **AUDIT-0023 Risk Guard Stub Removal (Critical)**
-	- [ ] Replace legacy `RiskGuards.FeesKillEdge(...)` overload that always returns `false` with real logic or delete callsites and obsolete overload.
-	- [ ] Add compile-time deprecation marker and route all consumers to canonical notional-based overload.
-	- [ ] Add unit-level validation cases for fee-kill thresholds (edge < fees, edge ~= fees, edge >> fees).
-- [ ] **AUDIT-0024 Strategy Null/Empty Guards (Critical)**
-	- [ ] Update parameterless `GetSignal(List<Candle>)` wrappers in ORB/VWAP/RSI/Donchian to safely handle `null` and `Count == 0`.
-	- [ ] Enforce index bounds consistently before dereferencing in all strategy entrypoints.
-	- [ ] Validate behavior in backtest/paper/live flows to return "no signal" instead of exceptions.
+- [x] **AUDIT-0023 Risk Guard Stub Removal (Critical)**
+	- [x] Replace legacy `RiskGuards.FeesKillEdge(...)` overload that always returns `false` with real logic or delete callsites and obsolete overload.
+	- [x] Add compile-time deprecation marker and route all consumers to canonical notional-based overload.
+	- [x] Add unit-level validation cases for fee-kill thresholds (edge < fees, edge ~= fees, edge >> fees).
+- [x] **AUDIT-0024 Strategy Null/Empty Guards (Critical)**
+	- [x] Update parameterless `GetSignal(List<Candle>)` wrappers in ORB/VWAP/RSI/Donchian to safely handle `null` and `Count == 0`.
+	- [x] Enforce index bounds consistently before dereferencing in all strategy entrypoints.
+	- [x] Validate behavior in backtest/paper/live flows to return "no signal" instead of exceptions.
 - [ ] **AUDIT-0025 Donchian Routing Gap (Major)**
 	- [ ] Extend `StrategyEngine.SetStrategy` and strategy enum mapping to support `Donchian 20` aliases.
 	- [ ] Ensure UI strategy names and engine names are normalized to one canonical map.
@@ -375,9 +375,9 @@ Goal: move from single-venue execution to multi-venue edge capture by combining 
 
 ### Phase 19 Workstream D: UI (Designer-First)
 - [ ] Add Auto Mode designer sections for venue stack, routing policy, and funding-capture controls.
-- [ ] Add Auto Mode runtime status rows for chosen venue, degraded venues, and circuit-breaker state.
-- [ ] Add venue-specific credential templates in account/key dialogs.
-- [ ] Enforce per-exchange required credential fields in account/key save flows (research-backed matrix by venue API auth model).
+- [x] Add Auto Mode runtime status rows for chosen venue, degraded venues, and circuit-breaker state.
+- [x] Add venue-specific credential templates in account/key dialogs.
+- [x] Enforce per-exchange required credential fields in account/key save flows (research-backed matrix by venue API auth model).
 - [ ] Add planner/dashboard visibility for routing rationale and venue health counters.
 - [ ] Implement Auto Mode left-rail card decomposition (Profile, Venue Stack, Routing Policy, Funding, Guardrails) with fixed header/footer telemetry bands.
 - [ ] Add Planner grid diagnostics columns (`chosen venue`, `alternates`, `expected net edge`, `fee drag`, `slippage budget`, `reject reason`).

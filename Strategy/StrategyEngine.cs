@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using CryptoDayTraderSuite.Models;
+using CryptoDayTraderSuite.Util;
 
 namespace CryptoDayTraderSuite.Strategy
 {
@@ -53,7 +54,18 @@ namespace CryptoDayTraderSuite.Strategy
             int idx = index == -1 ? candles.Count - 1 : index;
             if (idx < 0 || idx >= candles.Count) return null;
 
-            var result = strategy.GetSignal(candles, idx);
+            StrategyResult result;
+            try
+            {
+                result = strategy.GetSignal(candles, idx);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("[StrategyEngine] Strategy signal generation failed; returning no-signal for " + productId
+                    + " strategy=" + Active + " index=" + idx.ToString(CultureInfo.InvariantCulture)
+                    + " error=" + ex.Message);
+                return null;
+            }
             if (!result.IsSignal) return null; /* no trade */
 
             /* Governor Check */
@@ -66,6 +78,15 @@ namespace CryptoDayTraderSuite.Strategy
             if (entry <= 0m || stop <= 0m) return null;
             var stopDistance = Math.Abs(entry - stop);
             if (stopDistance <= 0m) return null;
+            if (stopDistance < 0.00000001m)
+            {
+                Log.Warn("[StrategyEngine] Signal skipped due to tiny stop distance for " + productId
+                    + " strategy=" + Active
+                    + " entry=" + entry.ToString(CultureInfo.InvariantCulture)
+                    + " stop=" + stop.ToString(CultureInfo.InvariantCulture)
+                    + " distance=" + stopDistance.ToString(CultureInfo.InvariantCulture));
+                return null;
+            }
             
             /* compute costs */
             var feeRate = fees.TakerRate; /* assume taker for entry */
@@ -75,10 +96,26 @@ namespace CryptoDayTraderSuite.Strategy
             costs.TotalRoundTripRate = feeRate + fees.MakerRate + costs.EstimatedSpreadRate; /* approx */
 
             /* risk sizing */
-            var riskPerTrade = equityUsd * riskFraction; /* $ risk */
+            decimal riskPerTrade;
+            try
+            {
+                riskPerTrade = equityUsd * riskFraction; /* $ risk */
+            }
+            catch (OverflowException)
+            {
+                return null;
+            }
             if (riskPerTrade <= 0m) return null;
             
-            var qty = riskPerTrade / stopDistance; /* qty */
+            decimal qty;
+            try
+            {
+                qty = riskPerTrade / stopDistance; /* qty */
+            }
+            catch (OverflowException)
+            {
+                return null;
+            }
             qty = Math.Round(qty, 6); if (qty <= 0m) return null; /* round */
             if (qty > 1000000m) return null;
             if (qty < 0.000001m) return null;

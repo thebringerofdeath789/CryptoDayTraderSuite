@@ -152,10 +152,10 @@ namespace CryptoDayTraderSuite.Brokers
                 };
 
                 var result = await client.PlaceOrderAsync(order).ConfigureAwait(false);
-                if (result == null) return (false, BuildFailureMessage("place", null, "empty order result"));
-                if (!result.Accepted) return (false, BuildFailureMessage("rejected", result.Message, "order rejected"));
+                if (result == null) return (false, BuildFailureMessage("place-response", null, "empty order result"));
+                if (!result.Accepted) return (false, BuildFailureMessage("place-rejected", result.Message, "order rejected"));
 
-                return (true, BuildSuccessMessage("accepted", "order=" + (result.OrderId ?? "(unknown)")));
+                return (true, BuildSuccessMessage("place-accepted", "order=" + (result.OrderId ?? "(unknown)")));
             }
             catch (Exception ex)
             {

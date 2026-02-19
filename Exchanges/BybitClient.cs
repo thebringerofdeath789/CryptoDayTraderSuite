@@ -112,6 +112,13 @@ namespace CryptoDayTraderSuite.Exchanges
 
                     var json = await HttpUtil.GetAsync(url).ConfigureAwait(false);
                     var root = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+                    if (!IsBybitSuccess(root))
+                    {
+                        var code = GetString(root, "retCode");
+                        var message = GetString(root, "retMsg");
+                        throw new InvalidOperationException("Bybit kline request failed (retCode=" + code + "): " + message);
+                    }
+
                     var result = GetMap(root, "result");
                     var list = ToObjectArray(result != null && result.ContainsKey("list") ? result["list"] : null);
                     if (list.Length == 0)
@@ -128,7 +135,12 @@ namespace CryptoDayTraderSuite.Exchanges
                         var openTimeMs = ToLong(row[0]);
                         if (openTimeMs > maxOpenTimeMs) maxOpenTimeMs = openTimeMs;
 
-                        var ts = DateTimeOffset.FromUnixTimeMilliseconds(openTimeMs).UtcDateTime;
+                        DateTime ts;
+                        if (!TryFromUnixMilliseconds(openTimeMs, out ts))
+                        {
+                            continue;
+                        }
+
                         if (ts < startUtc || ts > endUtc) continue;
 
                         outRows.Add(new Candle
@@ -179,18 +191,47 @@ namespace CryptoDayTraderSuite.Exchanges
                 var symbol = NormalizeProduct(productId);
                 var json = await HttpUtil.GetAsync(_restBaseUrl + "/v5/market/tickers?category=spot&symbol=" + Uri.EscapeDataString(symbol)).ConfigureAwait(false);
                 var root = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+                if (!IsBybitSuccess(root))
+                {
+                    var code = GetString(root, "retCode");
+                    var message = GetString(root, "retMsg");
+                    throw new InvalidOperationException("Bybit ticker request failed (retCode=" + code + "): " + message);
+                }
+
                 var result = GetMap(root, "result");
                 var list = ToObjectArray(result != null && result.ContainsKey("list") ? result["list"] : null);
-                if (list.Length == 0) return new Ticker { Time = DateTime.UtcNow };
+                if (list.Length == 0)
+                {
+                    throw new InvalidOperationException("Bybit ticker request returned no rows.");
+                }
 
                 var row = list[0] as Dictionary<string, object>;
-                if (row == null) return new Ticker { Time = DateTime.UtcNow };
+                if (row == null)
+                {
+                    throw new InvalidOperationException("Bybit ticker payload had invalid row shape.");
+                }
+
+                var bid = ToDecimal(GetString(row, "bid1Price"));
+                var ask = ToDecimal(GetString(row, "ask1Price"));
+                var last = ToDecimal(GetString(row, "lastPrice"));
+                if (last <= 0m && bid > 0m && ask > 0m && ask >= bid)
+                {
+                    last = (bid + ask) / 2m;
+                }
+
+                if (last <= 0m)
+                {
+                    throw new InvalidOperationException("Bybit ticker payload did not provide a valid last price.");
+                }
+
+                if (bid <= 0m) bid = last;
+                if (ask <= 0m) ask = last;
 
                 return new Ticker
                 {
-                    Bid = ToDecimal(GetString(row, "bid1Price")),
-                    Ask = ToDecimal(GetString(row, "ask1Price")),
-                    Last = ToDecimal(GetString(row, "lastPrice")),
+                    Bid = bid,
+                    Ask = ask,
+                    Last = last,
                     Time = DateTime.UtcNow
                 };
             }).ConfigureAwait(false);
@@ -313,13 +354,33 @@ namespace CryptoDayTraderSuite.Exchanges
 
                     var orderId = GetString(map, "orderId");
                     var symbol = GetString(map, "symbol");
+                    if (string.IsNullOrWhiteSpace(orderId) || string.IsNullOrWhiteSpace(symbol))
+                    {
+                        continue;
+                    }
                     var side = GetString(map, "side");
+                    if (!string.Equals(side, "BUY", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(side, "SELL", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(side, "Buy", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(side, "Sell", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
                     var type = GetString(map, "orderType");
                     var price = ToDecimal(GetString(map, "price"));
                     var qty = ToDecimal(GetString(map, "qty"));
                     var filled = ToDecimal(GetString(map, "cumExecQty"));
-                    var status = GetString(map, "orderStatus");
+                    var status = NormalizeOpenOrderStatus(GetString(map, "orderStatus"));
+                    if (string.IsNullOrWhiteSpace(status))
+                    {
+                        continue;
+                    }
                     var created = ToDecimal(GetString(map, "createdTime"));
+                    DateTime createdUtc;
+                    if (!TryFromUnixMilliseconds((long)created, out createdUtc))
+                    {
+                        continue;
+                    }
 
                     list.Add(new OpenOrder
                     {
@@ -331,11 +392,40 @@ namespace CryptoDayTraderSuite.Exchanges
                         Quantity = qty,
                         FilledQty = filled,
                         Status = status,
-                        CreatedUtc = DateTimeOffset.FromUnixTimeMilliseconds((long)created).UtcDateTime
+                        CreatedUtc = createdUtc
                     });
                 }
             }
             return list;
+        }
+
+        private static string NormalizeOpenOrderStatus(string rawStatus)
+        {
+            var status = string.IsNullOrWhiteSpace(rawStatus)
+                ? string.Empty
+                : rawStatus.Trim().ToUpperInvariant().Replace("-", "_").Replace(" ", "_");
+
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return string.Empty;
+            }
+
+            if (status.Contains("PARTIAL") && status.Contains("FILL"))
+            {
+                return "PARTIALLY_FILLED";
+            }
+
+            if (status == "NEW" || status == "OPEN" || status == "ACTIVE" || status == "WORKING" || status == "PENDING" || status == "RESTING" || status == "LIVE" || status == "UNTRIGGERED")
+            {
+                return "OPEN";
+            }
+
+            if (status == "PARTIALLY_FILLED")
+            {
+                return "PARTIALLY_FILLED";
+            }
+
+            return string.Empty;
         }
 
         public async Task<OrderResult> PlaceOrderAsync(OrderRequest order)
@@ -435,7 +525,12 @@ namespace CryptoDayTraderSuite.Exchanges
             var cancelReq = BuildSignedRequest(HttpMethod.Post, "/v5/order/cancel", string.Empty, body);
             var cancelJson = await HttpUtil.SendAsync(cancelReq).ConfigureAwait(false);
             var cancelRoot = UtilCompat.JsonDeserialize<Dictionary<string, object>>(cancelJson);
-            return IsBybitSuccess(cancelRoot);
+            if (!IsBybitSuccess(cancelRoot))
+            {
+                return false;
+            }
+
+            return IsBybitCancelOrderResponseForOrder(cancelRoot, orderId);
         }
 
         public async Task<bool> CancelAllOpenOrdersAsync(string productId)
@@ -533,6 +628,46 @@ namespace CryptoDayTraderSuite.Exchanges
             if (!string.IsNullOrWhiteSpace(retCode))
             {
                 return string.Equals(retCode, "0", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return false;
+        }
+
+        private bool IsBybitCancelOrderResponseForOrder(Dictionary<string, object> root, string orderId)
+        {
+            if (root == null || string.IsNullOrWhiteSpace(orderId))
+            {
+                return false;
+            }
+
+            var result = GetMap(root, "result");
+            var list = ToObjectArray(result != null && result.ContainsKey("list") ? result["list"] : null);
+            if (list.Length == 0)
+            {
+                list = ToObjectArray(result != null && result.ContainsKey("data") ? result["data"] : null);
+            }
+
+            if (list.Length == 0)
+            {
+                return true;
+            }
+
+            for (int i = 0; i < list.Length; i++)
+            {
+                var row = list[i] as Dictionary<string, object>;
+                if (row == null)
+                {
+                    continue;
+                }
+
+                var rowOrderId = ReadBybitOrderId(row);
+                if (!string.IsNullOrWhiteSpace(rowOrderId)
+                    && !string.Equals(rowOrderId, orderId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return IsBybitCancelAllRowSuccess(row);
             }
 
             return false;
@@ -787,6 +922,25 @@ namespace CryptoDayTraderSuite.Exchanges
             long v;
             if (long.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out v)) return v;
             return 0;
+        }
+
+        private bool TryFromUnixMilliseconds(long ms, out DateTime utc)
+        {
+            utc = DateTime.MinValue;
+            if (ms <= 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                utc = DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime;
+                return true;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
         }
 
         private string GetString(Dictionary<string, object> obj, string key)

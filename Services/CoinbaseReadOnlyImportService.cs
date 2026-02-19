@@ -99,8 +99,21 @@ namespace CryptoDayTraderSuite.Services
             {
                 throw new InvalidOperationException("Coinbase key not found for id: " + keyId + ".");
             }
+            if (!key.Enabled)
+            {
+                throw new InvalidOperationException("Coinbase key is disabled for id: " + keyId + ".");
+            }
+
+            if (!IsCoinbaseServiceName(key.Broker ?? key.Service))
+            {
+                throw new InvalidOperationException("Key id does not reference a Coinbase service: " + keyId + ".");
+            }
 
             var service = CanonicalCoinbaseService(key.Broker ?? key.Service);
+            if (string.IsNullOrWhiteSpace(service))
+            {
+                throw new InvalidOperationException("Unable to resolve canonical Coinbase service for key id: " + keyId + ".");
+            }
             var normalizedKeyId = KeyEntry.MakeId(service, key.Label ?? string.Empty);
 
             var apiKey = SafeUnprotect(key.ApiKey);
@@ -117,9 +130,13 @@ namespace CryptoDayTraderSuite.Services
             var fees = await client.GetFeesAsync().ConfigureAwait(false);
             var balances = await client.GetBalancesAsync().ConfigureAwait(false);
             var fills = new List<Dictionary<string, object>>();
+            var fillLimit = ResolveFillImportLimit();
             try
             {
-                fills = await client.GetRecentFillsAsync(250).ConfigureAwait(false);
+                fills = await client.GetRecentFillsAsync(fillLimit).ConfigureAwait(false);
+                Log.Info("[CoinbaseReadOnlyImport] Fill fetch summary: requestedLimit=" + fillLimit
+                    + " fetched=" + (fills == null ? 0 : fills.Count)
+                    + " maybeTruncated=" + ((fills != null && fills.Count >= fillLimit) ? "1" : "0"));
             }
             catch (Exception ex)
             {
@@ -218,7 +235,13 @@ namespace CryptoDayTraderSuite.Services
                 if (sideUpper == "S") sideUpper = "SELL";
                 if (sideUpper != "BUY" && sideUpper != "SELL")
                 {
-                    sideUpper = "UNKNOWN";
+                    continue;
+                }
+
+                var fillStatus = ReadStringByCandidates(row, "status", "trade_status", "tradeStatus", "fill_status", "fillStatus", "order_status", "orderStatus");
+                if (IsRejectedOrCanceledFillStatus(fillStatus))
+                {
+                    continue;
                 }
 
                 var qty = ReadDecimalByCandidates(row, "size", "base_size", "filled_size", "filled_quantity", "filledQuantity", "quantity", "qty", "last_fill_size", "lastFillSize");
@@ -244,6 +267,11 @@ namespace CryptoDayTraderSuite.Services
                     continue;
                 }
 
+                if (price <= 0m && notional <= 0m)
+                {
+                    continue;
+                }
+
                 var atUtc = ReadDateTimeByCandidates(row, "trade_time", "tradeTime", "fill_time", "fillTime", "created_time", "createdTime", "time", "timestamp");
                 if (atUtc == DateTime.MinValue) atUtc = DateTime.UtcNow;
 
@@ -253,7 +281,8 @@ namespace CryptoDayTraderSuite.Services
 					continue;
                 }
 
-                stats.TotalFees += fee;
+                var feePaid = fee > 0m ? fee : 0m;
+                stats.TotalFees += feePaid;
 
                 var gross = notional > 0m ? notional : (qty * price);
 
@@ -443,10 +472,33 @@ namespace CryptoDayTraderSuite.Services
 
         private KeyInfo ResolveCoinbaseKeyByIdOrFallback(string keyId)
         {
-            var direct = _keyService.Get(keyId);
-            if (direct != null)
+            if (!string.IsNullOrWhiteSpace(keyId))
             {
-                return NormalizeKeyService(direct);
+                var direct = _keyService.Get(keyId);
+                if (direct != null)
+                {
+                    if (!IsCoinbaseServiceName(direct.Broker ?? direct.Service))
+                    {
+                        return null;
+                    }
+                    return NormalizeKeyService(direct);
+                }
+
+                string broker;
+                string label;
+                KeyEntry.SplitId(keyId, out broker, out label);
+                var canonicalId = KeyEntry.MakeId("coinbase-advanced", label ?? string.Empty);
+                direct = _keyService.Get(canonicalId);
+                if (direct != null)
+                {
+                    if (!IsCoinbaseServiceName(direct.Broker ?? direct.Service))
+                    {
+                        return null;
+                    }
+                    return NormalizeKeyService(direct);
+                }
+
+                return null;
             }
 
             return ResolveCoinbaseKeyByPreference();
@@ -456,18 +508,31 @@ namespace CryptoDayTraderSuite.Services
         {
             if (key == null) return null;
             var normalized = CanonicalCoinbaseService(key.Broker ?? key.Service);
-            key.Broker = normalized;
-            key.Service = normalized;
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                key.Broker = normalized;
+                key.Service = normalized;
+            }
             return key;
         }
 
         private string CanonicalCoinbaseService(string raw)
         {
-            if (!string.IsNullOrWhiteSpace(raw) && raw.IndexOf("coinbase", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (IsCoinbaseServiceName(raw))
             {
                 return "coinbase-advanced";
             }
-            return "coinbase-advanced";
+            return string.Empty;
+        }
+
+        private bool IsCoinbaseServiceName(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return false;
+            }
+
+            return raw.IndexOf("coinbase", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private string SafeUnprotect(string value)
@@ -556,6 +621,24 @@ namespace CryptoDayTraderSuite.Services
         {
             var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CryptoDayTraderSuite");
             return Path.Combine(root, "coinbase_account_snapshots.json");
+        }
+
+        private int ResolveFillImportLimit()
+        {
+            const int fallback = 1000;
+            const int min = 100;
+            const int max = 5000;
+
+            var raw = Environment.GetEnvironmentVariable("CDTS_COINBASE_IMPORT_FILL_LIMIT");
+            int parsed;
+            if (!int.TryParse(raw, out parsed))
+            {
+                return fallback;
+            }
+
+            if (parsed < min) return min;
+            if (parsed > max) return max;
+            return parsed;
         }
 
         private decimal ReadDecimal(Dictionary<string, object> row, string key)
@@ -682,6 +765,22 @@ namespace CryptoDayTraderSuite.Services
                 || note.StartsWith("coinbase_fill_fp:", StringComparison.OrdinalIgnoreCase);
         }
 
+        private bool IsRejectedOrCanceledFillStatus(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return false;
+            }
+
+            var normalized = status.Trim().ToUpperInvariant().Replace('-', '_').Replace(' ', '_');
+            return normalized.Contains("REJECT")
+                || normalized.Contains("FAIL")
+                || normalized.Contains("CANCEL")
+                || normalized == "INVALID"
+                || normalized == "DENIED"
+                || normalized == "EXPIRED";
+        }
+
         private string NormalizeProductId(string productId)
         {
             if (string.IsNullOrWhiteSpace(productId))
@@ -706,13 +805,27 @@ namespace CryptoDayTraderSuite.Services
             long unix;
             if (long.TryParse(raw, out unix))
             {
-                if (unix > 1000000000000L)
+                if (unix >= 1000000000000L)
                 {
-                    return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(unix);
+                    try
+                    {
+                        return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(unix);
+                    }
+                    catch
+                    {
+                        return DateTime.MinValue;
+                    }
                 }
-                if (unix > 1000000000L)
+                if (unix >= 1000000000L)
                 {
-                    return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(unix);
+                    try
+                    {
+                        return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(unix);
+                    }
+                    catch
+                    {
+                        return DateTime.MinValue;
+                    }
                 }
             }
 

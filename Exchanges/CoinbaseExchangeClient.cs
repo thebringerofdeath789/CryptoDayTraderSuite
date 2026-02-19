@@ -198,6 +198,18 @@ namespace CryptoDayTraderSuite.Exchanges
 				    Log.Warn($"[Coinbase] Unsupported granularity '{minutes}m' normalized to '{normalizedMinutes}m'.");
 			    }
 			    var gran = normalizedMinutes * 60; /* seconds */
+                var granStr = "";
+                switch (gran)
+                {
+                    case 60: granStr = "ONE_MINUTE"; break;
+                    case 300: granStr = "FIVE_MINUTE"; break;
+                    case 900: granStr = "FIFTEEN_MINUTE"; break;
+                    case 3600: granStr = "ONE_HOUR"; break;
+                    case 21600: granStr = "SIX_HOUR"; break;
+                    case 86400: granStr = "ONE_DAY"; break;
+                    default: granStr = "ONE_MINUTE"; break;
+                }
+
 			    const int maxBucketsPerRequest = 280; /* keep below exchange hard limit */
 			    var maxSpan = TimeSpan.FromSeconds(gran * maxBucketsPerRequest);
 
@@ -208,37 +220,112 @@ namespace CryptoDayTraderSuite.Exchanges
 				    var chunkEnd = cursor.Add(maxSpan);
 				    if (chunkEnd > endUtc) chunkEnd = endUtc;
 
-				    var url = Rest + "/products/" + pair + "/candles?granularity=" + gran + "&start=" + cursor.ToString("o") + "&end=" + chunkEnd.ToString("o"); /* url */
-				    var json = await HttpUtil.GetAsync(url); /* get */
-				    var arr = UtilCompat.JsonDeserialize<object[]>(json); /* parse */
-				    if (arr != null) foreach (var o in arr)
-				    {
-					    var row = o as object[]; if (row == null || row.Length < 6) continue; /* check */
+                    List<Candle> chunk = null;
 
-						long epochSeconds;
-						decimal low;
-						decimal high;
-						decimal open;
-						decimal close;
-						decimal volume;
+                    // Try Advanced Trade authenticated if available
+                    if (IsAdvancedCredentialAuth)
+                    {
+                        try
+                        {
+                            var atUrl = "/api/v3/brokerage/products/" + pair + "/candles?granularity=" + granStr + "&start=" + ((DateTimeOffset)cursor).ToUnixTimeSeconds() + "&end=" + ((DateTimeOffset)chunkEnd).ToUnixTimeSeconds();
+                            var json = await PrivateRequestAsync("GET", atUrl).ConfigureAwait(false);
+                            var root = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+                            if (root != null)
+                            {
+                                var candles = ReadObjectList(root, "candles");
+                                if (candles.Count > 0)
+                                {
+                                    chunk = new List<Candle>();
+									foreach (var c in candles)
+                                    {
+										var t = ReadDateTimeValue(c, "start");
+										if (t == DateTime.MinValue) t = ReadDateTimeValue(c, "start_time");
+										if (t == DateTime.MinValue) t = ReadDateTimeValue(c, "startTime");
+										if (t == DateTime.MinValue) t = ReadDateTimeValue(c, "time");
+										if (t == DateTime.MinValue)
+										{
+											object rawStart;
+											long ts;
+											if (TryGetObjectValue(c, "start", out rawStart) && TryReadLong(rawStart, out ts))
+											{
+												t = DateTimeOffset.FromUnixTimeSeconds(ts).UtcDateTime;
+											}
+										}
 
-						if (!TryReadLong(row[0], out epochSeconds)) continue;
-						if (!TryReadDecimal(row[1], out low)) continue;
-						if (!TryReadDecimal(row[2], out high)) continue;
-						if (!TryReadDecimal(row[3], out open)) continue;
-						if (!TryReadDecimal(row[4], out close)) continue;
-						if (!TryReadDecimal(row[5], out volume)) continue;
+										decimal low;
+										decimal high;
+										decimal open;
+										decimal close;
+										decimal volume;
+										if (!TryReadDecimalValue(c, "low", out low)) continue;
+										if (!TryReadDecimalValue(c, "high", out high)) continue;
+										if (!TryReadDecimalValue(c, "open", out open)) continue;
+										if (!TryReadDecimalValue(c, "close", out close)) continue;
+										if (!TryReadDecimalValue(c, "volume", out volume)) continue;
+										if (t == DateTime.MinValue) continue;
 
-						res.Add(new Candle
-						{
-							Time = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(epochSeconds),
-							Low = low,
-							High = high,
-							Open = open,
-							Close = close,
-							Volume = volume
-						}); /* add */
-				    }
+                                        chunk.Add(new Candle
+                                        {
+                                            Time = t,
+											Low = low,
+											High = high,
+											Open = open,
+											Close = close,
+											Volume = volume
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warn($"[Coinbase] Advanced Trade candles failed for {pair}: {ex.Message}. Falling back to legacy.");
+                        }
+                    }
+
+                    if (chunk == null)
+                    {
+				        var url = Rest + "/products/" + pair + "/candles?granularity=" + gran + "&start=" + cursor.ToString("o") + "&end=" + chunkEnd.ToString("o"); /* url */
+				        var json = await HttpUtil.GetAsync(url); /* get */
+				        var arr = UtilCompat.JsonDeserialize<object[]>(json); /* parse */
+				        if (arr != null) 
+                        {
+                            chunk = new List<Candle>();
+                            foreach (var o in arr)
+                            {
+					            var row = o as object[]; if (row == null || row.Length < 6) continue; /* check */
+
+						        long epochSeconds;
+						        decimal low;
+						        decimal high;
+						        decimal open;
+						        decimal close;
+						        decimal volume;
+
+						        if (!TryReadLong(row[0], out epochSeconds)) continue;
+						        if (!TryReadDecimal(row[1], out low)) continue;
+						        if (!TryReadDecimal(row[2], out high)) continue;
+						        if (!TryReadDecimal(row[3], out open)) continue;
+						        if (!TryReadDecimal(row[4], out close)) continue;
+						        if (!TryReadDecimal(row[5], out volume)) continue;
+
+						        chunk.Add(new Candle
+						        {
+							        Time = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(epochSeconds),
+							        Low = low,
+							        High = high,
+							        Open = open,
+							        Close = close,
+							        Volume = volume
+						        });
+                            }
+                        }
+                    }
+
+                    if (chunk != null)
+                    {
+				        foreach (var c in chunk) res.Add(c);
+                    }
 
 					cursor = chunkEnd;
 			    }
@@ -278,15 +365,72 @@ namespace CryptoDayTraderSuite.Exchanges
             return await HttpUtil.RetryAsync(async () => 
             {
 			    var pair = NormalizeProduct(productId); /* pair */
-			    var url = Rest + "/products/" + pair + "/ticker"; /* url */
-			    var json = await HttpUtil.GetAsync(url); /* get */
-			    var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase); /* parse */
+                
+                Dictionary<string, object> obj = null;
 
-				var bid = ReadDecimalValue(obj, "bid");
-				var ask = ReadDecimalValue(obj, "ask");
-				var last = ReadDecimalValue(obj, "price");
-				if (last <= 0m) last = ReadDecimalValue(obj, "last");
-				if (last <= 0m) last = ReadDecimalValue(obj, "trade_price");
+                // Try Advanced Trade authenticated if available (preferred)
+                if (IsAdvancedCredentialAuth)
+                {
+                    try 
+                    {
+                        var json = await PrivateRequestAsync("GET", "/api/v3/brokerage/products/" + pair + "/ticker").ConfigureAwait(false);
+						obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+						if (obj != null)
+						{
+							var nestedTicker = ReadObject(obj, "ticker");
+							if (nestedTicker != null)
+							{
+								obj = nestedTicker;
+							}
+
+							var hasTopLevelFields = ReadDecimalByCandidates(obj, "bid", "best_bid", "bestBid", "ask", "best_ask", "bestAsk", "price", "last", "trade_price") > 0m
+								|| ReadObjectList(obj, "trades").Count > 0;
+							if (!hasTopLevelFields)
+							{
+								obj = null;
+							}
+						}
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"[Coinbase] Advanced Trade ticker failed for {pair}: {ex.Message}. Falling back to legacy.");
+                    }
+                }
+
+                // Fallback or Public: Legacy
+                if (obj == null)
+                {
+			        var url = Rest + "/products/" + pair + "/ticker"; /* url */
+			        var json = await HttpUtil.GetAsync(url); /* get */
+			        obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase); /* parse */
+                }
+
+				var bid = ReadDecimalByCandidates(obj, "bid", "best_bid", "bestBid");
+				var ask = ReadDecimalByCandidates(obj, "ask", "best_ask", "bestAsk");
+				var last = ReadDecimalByCandidates(obj, "price", "last", "trade_price"); // legacy uses "price", AT uses "price" on product or trades array?
+                
+                // AT ticker response has "trades": [...] which contains "price"? No, AT Ticker endpoint returns best_bid/best_ask/trades.
+                // Actually, GET /api/v3/brokerage/products/{id}/ticker returns { "trades": [...], "best_bid": "...", "best_ask": "..." }
+                // Use the last trade price from "trades" array if "price" is missing
+                if (last <= 0m)
+                {
+                    var trades = ReadObjectList(obj, "trades");
+                    if (trades.Count > 0)
+                    {
+                        last = ReadDecimalByCandidates(trades[0], "price", "trade_price");
+                    }
+                }
+
+                // If still missing, maybe we got a product-book snapshot?
+				if (last <= 0m)
+				{
+					// try to infer from mid-market if bid/ask available
+                    if (bid > 0m && ask > 0m)
+                    {
+                        last = (bid + ask) / 2m;
+                    }
+				}
+
 				if (last <= 0m)
 				{
 					throw new InvalidOperationException("Coinbase ticker response missing valid last price for " + pair + ".");
@@ -296,6 +440,16 @@ namespace CryptoDayTraderSuite.Exchanges
 				if (ask <= 0m) ask = last;
 
 				var time = ReadDateTimeValue(obj, "time");
+                if (time == DateTime.MinValue)
+                {
+                    // AT "time" might be inside trades?
+                    var trades = ReadObjectList(obj, "trades");
+                    if (trades.Count > 0)
+                    {
+                        time = ReadDateTimeValue(trades[0], "time");
+                    }
+                }
+
 				if (time == DateTime.MinValue)
 				{
 					time = DateTime.UtcNow;
@@ -462,12 +616,7 @@ namespace CryptoDayTraderSuite.Exchanges
 				errorResponse = ReadObject(objAdvanced, "errorResponse");
 			}
 
-			var rejectReason = ReadStringValue(objAdvanced, "reject_reason");
-			if (string.IsNullOrWhiteSpace(rejectReason)) rejectReason = ReadStringValue(objAdvanced, "rejectReason");
-			if (string.IsNullOrWhiteSpace(rejectReason)) rejectReason = ReadStringValue(successResponse, "reject_reason");
-			if (string.IsNullOrWhiteSpace(rejectReason)) rejectReason = ReadStringValue(successResponse, "rejectReason");
-			if (string.IsNullOrWhiteSpace(rejectReason)) rejectReason = ReadStringValue(errorResponse, "reject_reason");
-			if (string.IsNullOrWhiteSpace(rejectReason)) rejectReason = ReadStringValue(errorResponse, "rejectReason");
+			var rejectReason = ReadRejectReasonByCandidates(objAdvanced, successResponse, orderObject, errorResponse);
 
 			var status = ReadStringValue(successResponse, "status");
 			if (string.IsNullOrWhiteSpace(status)) status = ReadStringValue(successResponse, "order_status");
@@ -507,7 +656,23 @@ namespace CryptoDayTraderSuite.Exchanges
 					|| statusUpper == "FULLY_FILLED";
 			}
 
-			var acceptedAdvanced = (success || !string.IsNullOrWhiteSpace(orderId) || filled || !string.IsNullOrWhiteSpace(status)) && !hasReject;
+			var errorMessage = ReadErrorMessageByCandidates(errorResponse, objAdvanced, successResponse, orderObject);
+			if (!hasReject
+				&& !success
+				&& string.IsNullOrWhiteSpace(orderId)
+				&& !filled
+				&& !string.IsNullOrWhiteSpace(errorMessage)
+				&& !IsAcceptedOrderStatus(statusUpper))
+			{
+				hasReject = true;
+				if (string.IsNullOrWhiteSpace(rejectReason))
+				{
+					rejectReason = errorMessage;
+				}
+			}
+
+			var acceptedAdvanced = !hasReject
+				&& (success || !string.IsNullOrWhiteSpace(orderId) || filled || IsAcceptedOrderStatus(statusUpper));
 			var message = ResolveOrderMessage(acceptedAdvanced, filled, status, rejectReason, errorResponse, objAdvanced);
 
 			return new OrderResult
@@ -556,6 +721,9 @@ namespace CryptoDayTraderSuite.Exchanges
 				var rowOrderId = ResolveOrderId(row);
 				var rowStatus = ReadStatusValue(row);
 				var rowStatusUpper = string.IsNullOrWhiteSpace(rowStatus) ? string.Empty : rowStatus.ToUpperInvariant();
+				var rowError = ReadObject(row, "error") ?? ReadObject(row, "error_response") ?? ReadObject(row, "errorResponse");
+				var rowRejectReason = ReadRejectReasonByCandidates(row, rowError);
+				var rowErrorMessage = ReadErrorMessageByCandidates(row, rowError);
 
 				var rowSuccess = ReadBoolValue(row, "success") || ReadBoolValue(row, "is_success");
 				if (!rowSuccess)
@@ -564,18 +732,20 @@ namespace CryptoDayTraderSuite.Exchanges
 				}
 
 				var rowFailed = IsFailureLikeStatus(rowStatusUpper)
-					|| IsRejectReason(ReadStringValue(row, "reject_reason"))
-					|| IsRejectReason(ReadStringValue(row, "rejectReason"));
+					|| IsRejectReason(rowRejectReason)
+					|| (!rowSuccess && !string.IsNullOrWhiteSpace(rowErrorMessage));
 
-				var idMatches = string.IsNullOrWhiteSpace(rowOrderId)
-					|| string.Equals(rowOrderId, orderId, StringComparison.OrdinalIgnoreCase);
+				var hasRowOrderId = !string.IsNullOrWhiteSpace(rowOrderId);
+				var idMatches = hasRowOrderId
+					&& string.Equals(rowOrderId, orderId, StringComparison.OrdinalIgnoreCase);
+				var singleResultNoId = !hasRowOrderId && results.Count == 1;
 
-				if (rowFailed && idMatches)
+				if (rowFailed && (idMatches || singleResultNoId))
 				{
 					return false;
 				}
 
-				if (rowSuccess && idMatches)
+				if (rowSuccess && (idMatches || singleResultNoId))
 				{
 					return true;
 				}
@@ -612,42 +782,102 @@ namespace CryptoDayTraderSuite.Exchanges
 				orders = ReadObjectList(root, "data");
 			}
 
+			var normalizedFilterProduct = string.IsNullOrWhiteSpace(productId) ? string.Empty : NormalizeProduct(productId);
+
 			var filtered = FilterOpenOrders(orders);
             var list = new List<OpenOrder>();
             foreach (var row in filtered)
             {
-                var pid = ReadStringValue(row, "product_id");
-                if (!string.IsNullOrWhiteSpace(productId) && !string.Equals(pid, productId, StringComparison.OrdinalIgnoreCase))
+				var pid = ResolveProductId(row);
+				if (string.IsNullOrWhiteSpace(pid))
+				{
+					pid = ReadStringValue(row, "symbol");
+				}
+				if (!string.IsNullOrWhiteSpace(normalizedFilterProduct)
+					&& !string.Equals(NormalizeProduct(pid), normalizedFilterProduct, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
-                var oid = ReadStringValue(row, "order_id");
+                var oid = ResolveOrderId(row);
+				if (string.IsNullOrWhiteSpace(oid) || string.IsNullOrWhiteSpace(pid))
+				{
+					continue;
+				}
                 var sideStr = ReadStringValue(row, "side");
+                if (string.IsNullOrWhiteSpace(sideStr)) sideStr = ReadStringValue(row, "order_side");
+                if (string.IsNullOrWhiteSpace(sideStr)) sideStr = ReadStringValue(row, "orderSide");
+				var normalizedSide = NormalizeSideValue(sideStr);
+				if (!string.Equals(normalizedSide, "BUY", StringComparison.OrdinalIgnoreCase)
+					&& !string.Equals(normalizedSide, "SELL", StringComparison.OrdinalIgnoreCase))
+				{
+					continue;
+				}
+
                 var typeStr = ReadStringValue(row, "order_type");
+                if (string.IsNullOrWhiteSpace(typeStr)) typeStr = ReadStringValue(row, "orderType");
+                if (string.IsNullOrWhiteSpace(typeStr)) typeStr = ReadStringValue(row, "type");
                 
                 /* Mapping logic for type/side/price */
-                var baseSize = ReadDecimalValue(row, "base_size");
-                if (baseSize <= 0m) baseSize = ReadDecimalValue(row, "size");
+                var baseSize = ReadDecimalByCandidates(row, "base_size", "size", "quantity", "qty", "orig_size", "remaining_size");
 
                 /* limit price might be 'limit_price' or inside 'order_configuration' */
-                var limitPrice = ReadDecimalValue(row, "limit_price");
-                if (limitPrice <= 0m) limitPrice = ReadDecimalValue(row, "price");
+                var limitPrice = ReadDecimalByCandidates(row, "limit_price", "price", "limitPrice", "average_filled_price", "avg_price");
+				if (limitPrice <= 0m)
+				{
+					var orderConfig = ReadObject(row, "order_configuration");
+					if (orderConfig != null)
+					{
+						var limitGtc = ReadObject(orderConfig, "limit_limit_gtc");
+						if (limitGtc != null)
+						{
+							limitPrice = ReadDecimalByCandidates(limitGtc, "limit_price", "limitPrice", "price");
+						}
 
-                var createdStr = ReadStringValue(row, "created_time");
-                DateTime created; 
-                if (!DateTime.TryParse(createdStr, out created)) created = DateTime.UtcNow;
+						if (limitPrice <= 0m)
+						{
+							var limitGtd = ReadObject(orderConfig, "limit_limit_gtd");
+							if (limitGtd != null)
+							{
+								limitPrice = ReadDecimalByCandidates(limitGtd, "limit_price", "limitPrice", "price");
+							}
+						}
+					}
+				}
+
+				var created = ReadDateTimeByCandidates(row, "created_time", "createdTime", "time", "submitted_time", "submittedTime");
+				if (created == DateTime.MinValue)
+				{
+					continue;
+				}
+
+				var normalizedType = string.IsNullOrWhiteSpace(typeStr) ? string.Empty : typeStr.Trim().ToUpperInvariant();
+				if (string.IsNullOrWhiteSpace(normalizedType))
+				{
+					var orderConfig = ReadObject(row, "order_configuration");
+					if (orderConfig != null)
+					{
+						if (ReadObject(orderConfig, "market_market_ioc") != null || ReadObject(orderConfig, "market_market_fok") != null)
+						{
+							normalizedType = "MARKET";
+						}
+						else if (ReadObject(orderConfig, "limit_limit_gtc") != null || ReadObject(orderConfig, "limit_limit_gtd") != null)
+						{
+							normalizedType = "LIMIT";
+						}
+					}
+				}
 
                 list.Add(new OpenOrder
                 {
                     OrderId = oid,
                     ProductId = pid,
-                    Side = "BUY".Equals(sideStr, StringComparison.OrdinalIgnoreCase) ? OrderSide.Buy : OrderSide.Sell,
-                    Type = "MARKET".Equals(typeStr, StringComparison.OrdinalIgnoreCase) ? OrderType.Market : OrderType.Limit,
+					Side = string.Equals(normalizedSide, "BUY", StringComparison.OrdinalIgnoreCase) ? OrderSide.Buy : OrderSide.Sell,
+                    Type = "MARKET".Equals(normalizedType, StringComparison.OrdinalIgnoreCase) ? OrderType.Market : OrderType.Limit,
                     Quantity = baseSize,
-                    FilledQty = ReadDecimalValue(row, "filled_size"),
+                    FilledQty = ReadDecimalByCandidates(row, "filled_size", "filledSize", "filled_quantity", "filledQuantity", "executed_size", "executedSize"),
                     Price = limitPrice,
-                    Status = ReadStatusValue(row),
+					Status = NormalizeOpenOrderStatusValue(ReadStatusValue(row), IsExplicitlyOpenOrderRow(row)),
                     CreatedUtc = created
                 });
             }
@@ -657,29 +887,225 @@ namespace CryptoDayTraderSuite.Exchanges
 		public async Task<List<Dictionary<string, object>>> GetRecentFillsAsync(int limit = 250)
 		{
 			if (limit < 1) limit = 1;
-			if (limit > 1000) limit = 1000;
+			if (limit > 5000) limit = 5000;
 
-			var jsonAdvanced = await PrivateRequestAsync("GET", "/api/v3/brokerage/orders/historical/fills?limit=" + limit.ToString(CultureInfo.InvariantCulture)).ConfigureAwait(false);
-			var root = UtilCompat.JsonDeserialize<Dictionary<string, object>>(jsonAdvanced) ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+			var pageSize = Math.Min(250, limit);
+			var maxPages = Math.Min(40, Math.Max(2, (limit / pageSize) + 2));
+			var allFills = new List<Dictionary<string, object>>();
+			var cursor = string.Empty;
+			var pagesFetched = 0;
+			var rowsFetched = 0;
+			var cursorAdvances = 0;
+			var stopReason = "max-pages";
+			for (int page = 0; page < maxPages && allFills.Count < limit; page++)
+			{
+				var path = "/api/v3/brokerage/orders/historical/fills?limit=" + pageSize.ToString(CultureInfo.InvariantCulture);
+				if (!string.IsNullOrWhiteSpace(cursor))
+				{
+					path += "&cursor=" + Uri.EscapeDataString(cursor);
+				}
+
+				var jsonAdvanced = await PrivateRequestAsync("GET", path).ConfigureAwait(false);
+				var root = UtilCompat.JsonDeserialize<Dictionary<string, object>>(jsonAdvanced) ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+				var pageRows = ReadFillRows(root);
+				pagesFetched++;
+				if (pageRows.Count == 0)
+				{
+					stopReason = "empty-page";
+					break;
+				}
+
+				rowsFetched += pageRows.Count;
+				allFills.AddRange(pageRows);
+				if (allFills.Count >= limit)
+				{
+					stopReason = "limit-reached";
+					break;
+				}
+
+				var hasMore = ReadHasMoreFills(root);
+				var nextCursor = ReadNextCursor(root);
+				if (string.IsNullOrWhiteSpace(nextCursor) || string.Equals(nextCursor, cursor, StringComparison.OrdinalIgnoreCase))
+				{
+					if (!hasMore || pageRows.Count < pageSize)
+					{
+						stopReason = !hasMore ? "no-has-more" : "short-page-no-cursor";
+						break;
+					}
+					stopReason = "cursor-stall";
+					break;
+				}
+
+				cursor = nextCursor;
+				cursorAdvances++;
+				if (pageRows.Count < pageSize && !hasMore)
+				{
+					stopReason = "short-page";
+					break;
+				}
+			}
+
+			if (allFills.Count > limit)
+			{
+				allFills = allFills.GetRange(0, limit);
+			}
+
+			var enriched = EnrichFillRows(allFills);
+			var deduped = DeduplicateFillRows(enriched);
+			Log.Info("[Coinbase] Fills pagination summary: requested=" + limit.ToString(CultureInfo.InvariantCulture)
+				+ " pageSize=" + pageSize.ToString(CultureInfo.InvariantCulture)
+				+ " pages=" + pagesFetched.ToString(CultureInfo.InvariantCulture) + "/" + maxPages.ToString(CultureInfo.InvariantCulture)
+				+ " rowsFetched=" + rowsFetched.ToString(CultureInfo.InvariantCulture)
+				+ " aggregated=" + allFills.Count.ToString(CultureInfo.InvariantCulture)
+				+ " deduped=" + deduped.Count.ToString(CultureInfo.InvariantCulture)
+				+ " cursorAdvances=" + cursorAdvances.ToString(CultureInfo.InvariantCulture)
+				+ " stop=" + stopReason);
+			return deduped;
+		}
+
+		private List<Dictionary<string, object>> ReadFillRows(Dictionary<string, object> root)
+		{
 			var fills = ReadObjectList(root, "fills");
 			if (fills.Count > 0)
 			{
-				return DeduplicateFillRows(EnrichFillRows(fills));
+				return fills;
+			}
+
+			var fillsRoot = ReadObject(root, "fills");
+			fills = ReadObjectList(fillsRoot, "fills");
+			if (fills.Count > 0)
+			{
+				return fills;
 			}
 
 			fills = ReadObjectList(root, "results");
 			if (fills.Count > 0)
 			{
-				return DeduplicateFillRows(EnrichFillRows(fills));
+				return fills;
+			}
+
+			fills = ReadObjectList(root, "fill_results");
+			if (fills.Count > 0)
+			{
+				return fills;
 			}
 
 			fills = ReadObjectList(root, "executions");
 			if (fills.Count > 0)
 			{
-				return DeduplicateFillRows(EnrichFillRows(fills));
+				return fills;
 			}
 
-			return DeduplicateFillRows(EnrichFillRows(ReadObjectList(root, "data")));
+			var response = ReadObject(root, "response");
+			fills = ReadObjectList(response, "fills");
+			if (fills.Count > 0)
+			{
+				return fills;
+			}
+
+			return ReadObjectList(root, "data");
+		}
+
+		private string ReadNextCursor(Dictionary<string, object> root)
+		{
+			var next = ReadStringByCandidates(root, "next_cursor", "nextCursor", "cursor", "next_page_cursor", "nextPageCursor", "page_cursor", "pageCursor", "after", "end_cursor", "endCursor");
+			if (!string.IsNullOrWhiteSpace(next))
+			{
+				return next.Trim();
+			}
+
+			var pagination = ReadObject(root, "pagination");
+			next = ReadStringByCandidates(pagination, "next_cursor", "nextCursor", "cursor", "next_page_cursor", "nextPageCursor", "page_cursor", "pageCursor", "after", "end_cursor", "endCursor");
+			if (!string.IsNullOrWhiteSpace(next))
+			{
+				return next.Trim();
+			}
+
+			var links = ReadObject(root, "links");
+			var nextLink = ReadStringByCandidates(links, "next", "next_url", "nextUrl", "next_uri", "nextUri");
+			next = TryReadCursorFromUrl(nextLink);
+			if (!string.IsNullOrWhiteSpace(next))
+			{
+				return next;
+			}
+
+			var response = ReadObject(root, "response");
+			next = ReadStringByCandidates(response, "next_cursor", "nextCursor", "cursor", "next_page_cursor", "nextPageCursor", "page_cursor", "pageCursor", "after", "end_cursor", "endCursor");
+			if (!string.IsNullOrWhiteSpace(next))
+			{
+				return next.Trim();
+			}
+
+			return string.Empty;
+		}
+
+		private bool ReadHasMoreFills(Dictionary<string, object> root)
+		{
+			if (ReadBoolValue(root, "has_next") || ReadBoolValue(root, "hasNext") || ReadBoolValue(root, "has_more") || ReadBoolValue(root, "hasMore") || ReadBoolValue(root, "more") || ReadBoolValue(root, "has_next_page") || ReadBoolValue(root, "hasNextPage"))
+			{
+				return true;
+			}
+
+			var pagination = ReadObject(root, "pagination");
+			return ReadBoolValue(pagination, "has_next")
+				|| ReadBoolValue(pagination, "hasNext")
+				|| ReadBoolValue(pagination, "has_more")
+				|| ReadBoolValue(pagination, "hasMore")
+				|| ReadBoolValue(pagination, "more")
+				|| ReadBoolValue(pagination, "has_next_page")
+				|| ReadBoolValue(pagination, "hasNextPage");
+		}
+
+		private string TryReadCursorFromUrl(string value)
+		{
+			if (string.IsNullOrWhiteSpace(value))
+			{
+				return string.Empty;
+			}
+
+			try
+			{
+				Uri parsed;
+				if (!Uri.TryCreate(value, UriKind.Absolute, out parsed))
+				{
+					return string.Empty;
+				}
+
+				var query = parsed.Query;
+				if (string.IsNullOrWhiteSpace(query))
+				{
+					return string.Empty;
+				}
+
+				var parts = query.TrimStart('?').Split('&');
+				for (int i = 0; i < parts.Length; i++)
+				{
+					var part = parts[i];
+					if (string.IsNullOrWhiteSpace(part)) continue;
+
+					var idx = part.IndexOf('=');
+					if (idx <= 0 || idx >= part.Length - 1) continue;
+
+					var key = Uri.UnescapeDataString(part.Substring(0, idx));
+					var val = Uri.UnescapeDataString(part.Substring(idx + 1));
+					if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(val)) continue;
+
+					if (string.Equals(key, "cursor", StringComparison.OrdinalIgnoreCase)
+						|| string.Equals(key, "page_cursor", StringComparison.OrdinalIgnoreCase)
+						|| string.Equals(key, "next_cursor", StringComparison.OrdinalIgnoreCase)
+						|| string.Equals(key, "after", StringComparison.OrdinalIgnoreCase)
+						|| string.Equals(key, "end_cursor", StringComparison.OrdinalIgnoreCase))
+					{
+						return val.Trim();
+					}
+				}
+			}
+			catch
+			{
+				return string.Empty;
+			}
+
+			return string.Empty;
 		}
 
 		private List<Dictionary<string, object>> FilterOpenOrders(List<Dictionary<string, object>> orders)
@@ -814,26 +1240,18 @@ namespace CryptoDayTraderSuite.Exchanges
 					row["fee"] = fee;
 				}
 
-				var tradeTime = ReadStringValue(row, "trade_time");
-				if (string.IsNullOrWhiteSpace(tradeTime)) tradeTime = ReadStringValue(row, "tradeTime");
-				if (string.IsNullOrWhiteSpace(tradeTime)) tradeTime = ReadStringValue(row, "fill_time");
-				if (string.IsNullOrWhiteSpace(tradeTime)) tradeTime = ReadStringValue(row, "fillTime");
-				if (string.IsNullOrWhiteSpace(tradeTime)) tradeTime = ReadStringValue(row, "created_time");
-				if (string.IsNullOrWhiteSpace(tradeTime)) tradeTime = ReadStringValue(row, "createdTime");
-				if (string.IsNullOrWhiteSpace(tradeTime)) tradeTime = ReadStringValue(row, "time");
-				if (string.IsNullOrWhiteSpace(tradeTime)) tradeTime = ReadStringValue(row, "timestamp");
-
-				if (string.IsNullOrWhiteSpace(tradeTime))
+				var parsedTradeTime = ReadDateTimeByCandidates(row, "trade_time", "tradeTime", "fill_time", "fillTime", "created_time", "createdTime", "time", "timestamp");
+				if (parsedTradeTime != DateTime.MinValue)
 				{
-					var parsedTime = ReadDateTimeByCandidates(row, "trade_time", "tradeTime", "fill_time", "fillTime", "created_time", "createdTime", "time", "timestamp");
-					if (parsedTime != DateTime.MinValue)
-					{
-						tradeTime = parsedTime.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
-					}
+					row["trade_time"] = parsedTradeTime.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
 				}
-				if (!string.IsNullOrWhiteSpace(tradeTime))
+				else
 				{
-					row["trade_time"] = tradeTime;
+					var tradeTime = ReadStringByCandidates(row, "trade_time", "tradeTime", "fill_time", "fillTime", "created_time", "createdTime", "time", "timestamp");
+					if (!string.IsNullOrWhiteSpace(tradeTime))
+					{
+						row["trade_time"] = tradeTime.Trim();
+					}
 				}
 			}
 
@@ -859,15 +1277,7 @@ namespace CryptoDayTraderSuite.Exchanges
 				if (string.IsNullOrWhiteSpace(id)) id = ReadStringValue(row, "id");
 
 				var key = string.IsNullOrWhiteSpace(id)
-					? string.Join("|", new[]
-					{
-						ReadStringValue(row, "order_id"),
-						ReadStringValue(row, "product_id"),
-						ReadStringValue(row, "side"),
-						ReadStringValue(row, "size"),
-						ReadStringValue(row, "price"),
-						ReadStringValue(row, "trade_time")
-					})
+					? BuildFallbackFillDedupeKey(row)
 					: "id:" + id.Trim();
 
 				if (!seen.Add(key))
@@ -879,6 +1289,75 @@ namespace CryptoDayTraderSuite.Exchanges
 			}
 
 			return output;
+		}
+
+		private string BuildFallbackFillDedupeKey(Dictionary<string, object> row)
+		{
+			if (row == null)
+			{
+				return string.Empty;
+			}
+
+			var orderId = ResolveOrderId(row);
+			var productId = ResolveProductId(row);
+			if (string.IsNullOrWhiteSpace(productId)) productId = ReadStringValue(row, "symbol");
+			productId = string.IsNullOrWhiteSpace(productId) ? "UNKNOWN" : NormalizeProduct(productId).ToUpperInvariant();
+
+			var side = NormalizeSideValue(ReadStringByCandidates(row, "side", "order_side", "orderSide", "trade_side", "tradeSide"));
+			if (string.IsNullOrWhiteSpace(side)) side = "UNKNOWN";
+
+			var qty = ReadDecimalByCandidates(row, "size", "base_size", "filled_size", "filled_quantity", "filledQuantity", "quantity", "qty", "last_fill_size", "lastFillSize");
+			var price = ReadDecimalByCandidates(row, "price", "trade_price", "tradePrice", "fill_price", "fillPrice", "average_filled_price", "averageFilledPrice", "avg_price", "avgPrice");
+			var notional = ReadDecimalByCandidates(row, "notional", "quote_size", "quoteSize", "quote_volume", "quoteVolume", "filled_value", "filledValue", "executed_value", "executedValue", "value", "usd_value", "usdValue");
+			var fee = ReadDecimalByCandidates(row, "fee", "fees", "commission", "total_fees", "totalFees", "fill_fees", "fillFees", "fee_amount", "feeAmount");
+
+			if (price <= 0m && qty > 0m && notional > 0m)
+			{
+				price = notional / qty;
+			}
+			if (notional <= 0m && qty > 0m && price > 0m)
+			{
+				notional = qty * price;
+			}
+
+			var atUtc = ReadDateTimeByCandidates(row, "trade_time", "tradeTime", "fill_time", "fillTime", "created_time", "createdTime", "time", "timestamp");
+			var ts = atUtc == DateTime.MinValue
+				? "0"
+				: atUtc.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture);
+
+			return string.Join("|", new[]
+			{
+				string.IsNullOrWhiteSpace(orderId) ? "" : orderId.Trim(),
+				productId,
+				side,
+				qty.ToString(CultureInfo.InvariantCulture),
+				price.ToString(CultureInfo.InvariantCulture),
+				notional.ToString(CultureInfo.InvariantCulture),
+				fee.ToString(CultureInfo.InvariantCulture),
+				ts
+			});
+		}
+
+		private string ReadStringByCandidates(Dictionary<string, object> row, params string[] keys)
+		{
+			if (row == null || keys == null)
+			{
+				return string.Empty;
+			}
+
+			for (int i = 0; i < keys.Length; i++)
+			{
+				var key = keys[i];
+				if (string.IsNullOrWhiteSpace(key)) continue;
+
+				var value = ReadStringValue(row, key);
+				if (!string.IsNullOrWhiteSpace(value))
+				{
+					return value;
+				}
+			}
+
+			return string.Empty;
 		}
 
 		private string NormalizeSideValue(string side)
@@ -1451,6 +1930,9 @@ namespace CryptoDayTraderSuite.Exchanges
 			return statusUpper.Contains("FAIL")
 				|| statusUpper.Contains("REJECT")
 				|| statusUpper.Contains("ERROR")
+				|| statusUpper.Contains("NOT_FOUND")
+				|| statusUpper.Contains("UNKNOWN_ORDER")
+				|| statusUpper.Contains("UNRECOGNIZED_ORDER")
 				|| statusUpper.Contains("DENIED")
 				|| statusUpper == "INVALID";
 		}
@@ -1473,6 +1955,30 @@ namespace CryptoDayTraderSuite.Exchanges
 				|| statusUpper == "NEW"
 				|| statusUpper == "PARTIALLY_FILLED"
 				|| statusUpper == "PARTIAL_FILL";
+		}
+
+		private string NormalizeOpenOrderStatusValue(string rawStatus, bool fallbackToOpen)
+		{
+			var statusUpper = string.IsNullOrWhiteSpace(rawStatus)
+				? string.Empty
+				: rawStatus.Trim().ToUpperInvariant().Replace("-", "_").Replace(" ", "_");
+
+			if (statusUpper.Contains("PARTIAL") && statusUpper.Contains("FILL"))
+			{
+				return "PARTIALLY_FILLED";
+			}
+
+			if (IsOpenLikeStatus(statusUpper))
+			{
+				return "OPEN";
+			}
+
+			if (fallbackToOpen)
+			{
+				return "OPEN";
+			}
+
+			return string.Empty;
 		}
 
 		private bool TryReadDecimal(object raw, out decimal value)
@@ -1499,7 +2005,18 @@ namespace CryptoDayTraderSuite.Exchanges
 
 		private DateTime ReadDateTimeValue(Dictionary<string, object> row, string key)
 		{
-			var raw = ReadStringValue(row, key);
+			if (row == null || string.IsNullOrWhiteSpace(key))
+			{
+				return DateTime.MinValue;
+			}
+
+			object rawObject;
+			if (!TryGetObjectValue(row, key, out rawObject) || rawObject == null)
+			{
+				return DateTime.MinValue;
+			}
+
+			var raw = rawObject.ToString();
 			if (string.IsNullOrWhiteSpace(raw))
 			{
 				return DateTime.MinValue;
@@ -1509,6 +2026,27 @@ namespace CryptoDayTraderSuite.Exchanges
 			if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out parsed))
 			{
 				return parsed;
+			}
+
+			long epoch;
+			if (long.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out epoch))
+			{
+				try
+				{
+					if (epoch > 9999999999L)
+					{
+						return DateTimeOffset.FromUnixTimeMilliseconds(epoch).UtcDateTime;
+					}
+
+					if (epoch > 0L)
+					{
+						return DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime;
+					}
+				}
+				catch
+				{
+					return DateTime.MinValue;
+				}
 			}
 
 			return DateTime.MinValue;
@@ -1528,6 +2066,91 @@ namespace CryptoDayTraderSuite.Exchanges
 				&& !string.Equals(normalized, "N/A", StringComparison.OrdinalIgnoreCase);
 		}
 
+		private bool IsAcceptedOrderStatus(string statusUpper)
+		{
+			if (string.IsNullOrWhiteSpace(statusUpper))
+			{
+				return false;
+			}
+
+			return statusUpper == "OPEN"
+				|| statusUpper == "OPENED"
+				|| statusUpper == "PENDING"
+				|| statusUpper == "PENDING_OPEN"
+				|| statusUpper == "QUEUED"
+				|| statusUpper == "ACTIVE"
+				|| statusUpper == "WORKING"
+				|| statusUpper == "RESTING"
+				|| statusUpper == "PARTIALLY_FILLED"
+				|| statusUpper == "PARTIAL_FILL"
+				|| statusUpper == "FILLED"
+				|| statusUpper == "DONE"
+				|| statusUpper == "COMPLETED";
+		}
+
+		private string ReadRejectReasonByCandidates(params Dictionary<string, object>[] sources)
+		{
+			if (sources == null)
+			{
+				return string.Empty;
+			}
+
+			for (int i = 0; i < sources.Length; i++)
+			{
+				var source = sources[i];
+				if (source == null) continue;
+
+				var value = ReadStringByCandidates(source,
+					"reject_reason",
+					"rejectReason",
+					"failure_reason",
+					"failureReason",
+					"error_reason",
+					"errorReason",
+					"reason");
+
+				if (IsRejectReason(value))
+				{
+					return value;
+				}
+			}
+
+			return string.Empty;
+		}
+
+		private string ReadErrorMessageByCandidates(params Dictionary<string, object>[] sources)
+		{
+			if (sources == null)
+			{
+				return string.Empty;
+			}
+
+			for (int i = 0; i < sources.Length; i++)
+			{
+				var source = sources[i];
+				if (source == null) continue;
+
+				var value = ReadStringByCandidates(source,
+					"message",
+					"error",
+					"error_details",
+					"errorDetails",
+					"detail",
+					"details",
+					"warning",
+					"reason",
+					"failure_reason",
+					"failureReason");
+
+				if (!string.IsNullOrWhiteSpace(value))
+				{
+					return value;
+				}
+			}
+
+			return string.Empty;
+		}
+
 		private string ResolveOrderMessage(bool accepted, bool filled, string status, string rejectReason, Dictionary<string, object> errorResponse, Dictionary<string, object> root)
 		{
 			if (filled)
@@ -1540,10 +2163,7 @@ namespace CryptoDayTraderSuite.Exchanges
 				return rejectReason;
 			}
 
-			var errorMessage = ReadStringValue(errorResponse, "message");
-			if (string.IsNullOrWhiteSpace(errorMessage)) errorMessage = ReadStringValue(errorResponse, "error");
-			if (string.IsNullOrWhiteSpace(errorMessage)) errorMessage = ReadStringValue(root, "message");
-			if (string.IsNullOrWhiteSpace(errorMessage)) errorMessage = ReadStringValue(root, "error");
+			var errorMessage = ReadErrorMessageByCandidates(errorResponse, root);
 
 			if (!accepted)
 			{

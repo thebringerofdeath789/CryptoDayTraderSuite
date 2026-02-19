@@ -53,7 +53,10 @@ namespace CryptoDayTraderSuite.Services
         private const decimal DefaultFundingMaxAgeMinutes = 20m;
         private const decimal DefaultAiProposerMinConfidence = 0.55m;
         private const decimal DefaultAiProposerMinRMultiple = 1.50m;
-        private const decimal DefaultAiProposerMaxEntryDriftR = 0.75m;
+        private const decimal ProposalPriceMatchTolerance = 0.00000001m;
+        private const decimal ProposalRMultipleTolerance = 0.000001m;
+        private const int ProposalPriceScale = 8;
+        private const int ProposalRScale = 6;
 
         public sealed class ProposalDiagnostics
         {
@@ -428,6 +431,7 @@ namespace CryptoDayTraderSuite.Services
                 Target = result.TakeProfit,
                 Qty = qty,
                 Note = $"AutoPlanner {strategyName} exp={selectedExpectancy:0.00} wr={selectedWinRate:0.0}%"
+					+ $" [Confidence={result.ConfidenceScore:0.####}]"
                     + $" [GrossEdge={edgeBreakdown.GrossEdgeR:0.0000}]"
                     + $" [FeeDrag={edgeBreakdown.FeeDragR:0.0000}]"
                     + $" [Slip={edgeBreakdown.SlippageBudgetR:0.0000}]"
@@ -1011,6 +1015,11 @@ namespace CryptoDayTraderSuite.Services
 
         private async Task<RoutingDiagnostics> BuildRoutingDiagnosticsAsync(string productId)
         {
+            if (GetEnvFlagEnabled("CDTS_ROUTING_DIAGNOSTICS_DISABLED") || GetEnvFlagEnabled("CDTS_ROUTING_DISABLED"))
+            {
+                return new RoutingDiagnostics { IsRoutable = false, Reason = "routing-disabled-env" };
+            }
+
             if (_multiVenueQuoteService == null || _smartOrderRouter == null)
             {
                 return null;
@@ -1206,6 +1215,21 @@ namespace CryptoDayTraderSuite.Services
             return fallback;
         }
 
+        private bool GetEnvFlagEnabled(string name)
+        {
+            var raw = Environment.GetEnvironmentVariable(name);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return false;
+            }
+
+            var normalized = raw.Trim();
+            return string.Equals(normalized, "1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "yes", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "on", StringComparison.OrdinalIgnoreCase);
+        }
+
         private decimal ToDecimal(double value)
         {
             if (double.IsNaN(value) || double.IsInfinity(value)) return 0m;
@@ -1338,12 +1362,16 @@ namespace CryptoDayTraderSuite.Services
                     {
                         minConfidence = GetEnvDecimal("CDTS_AI_PROPOSER_MIN_CONFIDENCE", DefaultAiProposerMinConfidence),
                         minRMultiple = GetEnvDecimal("CDTS_AI_PROPOSER_MIN_R", DefaultAiProposerMinRMultiple),
+                        signalPriceTolerance = ProposalPriceMatchTolerance,
+                        rMultipleTolerance = ProposalRMultipleTolerance,
+                        priceScale = ProposalPriceScale,
+                        rMultipleScale = ProposalRScale,
                         requireReasonMetricOrPriceReference = true,
                         requireReasonRiskNote = true,
                         reasonMaxChars = 220,
                         requireSignalAlignment = true
                     },
-                    rule = "Only propose trades that align with at least one provided live strategy signal and satisfy constraints."
+                    rule = "When approve=true, side/entry/stop/target must match one liveSignals row within constraints.signalPriceTolerance and satisfy constraints."
                 };
 
                 var contextJson = UtilCompat.JsonSerialize(payload);
@@ -1433,6 +1461,10 @@ namespace CryptoDayTraderSuite.Services
                     return null;
                 }
 
+                entry = NormalizePriceForContract(entry);
+                stop = NormalizePriceForContract(stop);
+                target = NormalizePriceForContract(target);
+
                 var distance = Math.Abs(entry - stop);
                 if (distance <= MinRiskDistance)
                 {
@@ -1464,9 +1496,15 @@ namespace CryptoDayTraderSuite.Services
                     return null;
                 }
 
-                var rrMultiple = rewardDistance / distance;
+                var rrMultiple = ComputeRMultiple(proposedSide, entry, stop, target);
+                if (rrMultiple <= 0m)
+                {
+                    Util.Log.Warn("[AutoPlanner] AI proposer rejected: computed R multiple is invalid.");
+                    return null;
+                }
+
                 var minRMultiple = GetEnvDecimal("CDTS_AI_PROPOSER_MIN_R", DefaultAiProposerMinRMultiple);
-                if (rrMultiple < minRMultiple)
+                if (rrMultiple + ProposalRMultipleTolerance < minRMultiple)
                 {
                     Util.Log.Info("[AutoPlanner] AI proposer rejected: R multiple below minimum. rr="
                         + rrMultiple.ToString("0.000") + " min=" + minRMultiple.ToString("0.000"));
@@ -1489,26 +1527,13 @@ namespace CryptoDayTraderSuite.Services
                 }
 
                 var matchedSignal = liveSignals
-                    .Where(s => string.Equals(s.Side, proposedSide == OrderSide.Buy ? "Buy" : "Sell", StringComparison.OrdinalIgnoreCase))
+                    .Where(s => IsExactSignalMatch(s, proposedSide, entry, stop, target))
                     .OrderByDescending(s => s.Expectancy)
                     .FirstOrDefault();
                 if (matchedSignal == null)
                 {
-                    Util.Log.Info("[AutoPlanner] AI proposer rejected: no live strategy signal aligns with proposed side.");
+                    Util.Log.Info("[AutoPlanner] AI proposer rejected: no live strategy signal exactly matches side/entry/stop/target.");
                     return null;
-                }
-
-                var signalRiskDistance = Math.Abs(matchedSignal.Entry - matchedSignal.Stop);
-                if (signalRiskDistance > MinRiskDistance)
-                {
-                    var entryDriftR = Math.Abs(entry - matchedSignal.Entry) / signalRiskDistance;
-                    var maxEntryDriftR = GetEnvDecimal("CDTS_AI_PROPOSER_MAX_ENTRY_DRIFT_R", DefaultAiProposerMaxEntryDriftR);
-                    if (entryDriftR > maxEntryDriftR)
-                    {
-                        Util.Log.Info("[AutoPlanner] AI proposer rejected: entry drift exceeds allowed R drift. driftR="
-                            + entryDriftR.ToString("0.000") + " max=" + maxEntryDriftR.ToString("0.000"));
-                        return null;
-                    }
                 }
 
                 if (!IsReasonDataBacked(proposal.Reason, entry, stop, target, matchedSignal, rrMultiple))
@@ -1951,10 +1976,15 @@ namespace CryptoDayTraderSuite.Services
         {
             var instructions = new[]
             {
-                "If uncertain, set approve=false and set numeric fields to 0.",
-                "When approve=true, stop/entry/target must satisfy valid risk geometry for the selected side and R multiple must be >= constraints.minRMultiple.",
+                "Return contract is wrapper + JSON payload only.",
+                "If uncertain, set approve=false; numeric fields may be 0.",
+                "When approve=true, side/entry/stop/target must exactly match one liveSignals item within constraints.signalPriceTolerance.",
+                "When approve=true, stop/entry/target must satisfy valid risk geometry for the selected side.",
+                "When approve=true, compute R as (target-entry)/(entry-stop) for Buy and (entry-target)/(stop-entry) for Sell; compare to constraints.minRMultiple using constraints.rMultipleTolerance.",
                 "When approve=true, confidence must be >= constraints.minConfidence.",
-                "Reason must be exactly one sentence under constraints.reasonMaxChars and include (a) at least one concrete metric/price reference from payload and (b) one explicit risk-control note (stop/risk/R)."
+                "Prices must use at most constraints.priceScale decimals.",
+                "Reason must be one short sentence under constraints.reasonMaxChars with no line breaks; include (a) at least one concrete metric/price reference from payload and (b) one explicit risk-control note (stop/risk/R).",
+                "When approve=false, still include a concise reason that cites at least one payload metric/price when available."
             };
 
             return StrictJsonPromptContract.BuildPrompt(
@@ -2192,11 +2222,66 @@ namespace CryptoDayTraderSuite.Services
             return false;
         }
 
+        private decimal NormalizePriceForContract(decimal value)
+        {
+            return Math.Round(value, ProposalPriceScale, MidpointRounding.AwayFromZero);
+        }
+
+        private decimal ComputeRMultiple(OrderSide side, decimal entry, decimal stop, decimal target)
+        {
+            decimal riskDistance;
+            decimal rewardDistance;
+
+            if (side == OrderSide.Buy)
+            {
+                riskDistance = entry - stop;
+                rewardDistance = target - entry;
+            }
+            else
+            {
+                riskDistance = stop - entry;
+                rewardDistance = entry - target;
+            }
+
+            if (riskDistance <= MinRiskDistance || rewardDistance <= MinRiskDistance)
+            {
+                return 0m;
+            }
+
+            return Math.Round(rewardDistance / riskDistance, ProposalRScale, MidpointRounding.AwayFromZero);
+        }
+
+        private bool IsExactSignalMatch(LiveSignalEvidence signal, OrderSide side, decimal entry, decimal stop, decimal target)
+        {
+            if (signal == null)
+            {
+                return false;
+            }
+
+            var expectedSide = side == OrderSide.Buy ? "Buy" : "Sell";
+            if (!string.Equals(signal.Side, expectedSide, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return ArePricesEquivalent(entry, signal.Entry)
+                && ArePricesEquivalent(stop, signal.Stop)
+                && ArePricesEquivalent(target, signal.Target);
+        }
+
+        private bool ArePricesEquivalent(decimal left, decimal right)
+        {
+            var normalizedLeft = NormalizePriceForContract(left);
+            var normalizedRight = NormalizePriceForContract(right);
+            return Math.Abs(normalizedLeft - normalizedRight) <= ProposalPriceMatchTolerance;
+        }
+
         private bool IsReasonDataBacked(string reason, decimal entry, decimal stop, decimal target, LiveSignalEvidence matchedSignal, decimal rrMultiple)
         {
             var text = (reason ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(text)) return false;
             if (text.Length < 24 || text.Length > 220) return false;
+            if (!IsSingleSentenceReason(text)) return false;
 
             var lower = text.ToLowerInvariant();
             var genericPhrases = new[]
@@ -2230,6 +2315,39 @@ namespace CryptoDayTraderSuite.Services
             var referencesR = ReferencesRMultiple(text, rrMultiple);
 
             if (!(hasRiskToken && (hasNumber || hasMetricToken || referencesPlanPrice || referencesR || referencesSignal)))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsSingleSentenceReason(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            if (text.IndexOf('\n') >= 0 || text.IndexOf('\r') >= 0)
+            {
+                return false;
+            }
+
+            var trimmed = text.Trim();
+            if (trimmed.Length == 0)
+            {
+                return false;
+            }
+
+            var sentenceTerminatorCount = trimmed.Count(ch => ch == '.' || ch == '!' || ch == '?');
+            if (sentenceTerminatorCount > 1)
+            {
+                return false;
+            }
+
+            var semicolonCount = trimmed.Count(ch => ch == ';');
+            if (semicolonCount > 1)
             {
                 return false;
             }

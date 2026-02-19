@@ -52,6 +52,8 @@ namespace CryptoDayTraderSuite.Exchanges
         {
             return await HttpUtil.RetryAsync(async () =>
             {
+                EnsureCredentials();
+
                 var nonce = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
                 var signForm = form ?? new Dictionary<string, string>();
                 signForm["nonce"] = nonce;
@@ -127,11 +129,12 @@ namespace CryptoDayTraderSuite.Exchanges
                                     if (rowAl != null) row = rowAl.ToArray();
                                 }
 
-                                if (row == null || row.Length < 6) continue;
+                                if (row == null || row.Length < 7) continue;
 
                                 double epochSeconds;
                                 if (!TryParseDoubleInvariant(row[0], out epochSeconds)) continue;
-                                var ts = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(epochSeconds);
+                                DateTime ts;
+                                if (!TryFromUnixSeconds((long)epochSeconds, out ts)) continue;
                                 if (ts < startUtc || ts > endUtc) continue;
 
                                 decimal open;
@@ -226,6 +229,23 @@ namespace CryptoDayTraderSuite.Exchanges
                         }
                     }
                 }
+
+                if (t.Last <= 0m)
+                {
+                    if (t.Bid > 0m && t.Ask > 0m && t.Ask >= t.Bid)
+                    {
+                        t.Last = (t.Bid + t.Ask) / 2m;
+                    }
+                }
+
+                if (t.Last <= 0m)
+                {
+                    throw new InvalidOperationException("Kraken ticker payload did not provide a valid last price.");
+                }
+
+                if (t.Bid <= 0m) t.Bid = t.Last;
+                if (t.Ask <= 0m) t.Ask = t.Last;
+
                 return t;
             });
         }
@@ -236,6 +256,8 @@ namespace CryptoDayTraderSuite.Exchanges
             // PrivatePostAsync already wraps RetryAsync
             var json = await PrivatePostAsync("/0/private/TradeVolume", body);
             var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+
+            EnsureNoKrakenErrors(obj, "trade volume");
 
             var maker = 0.0025m;
             var taker = 0.0040m;
@@ -284,7 +306,10 @@ namespace CryptoDayTraderSuite.Exchanges
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Kraken fee parsing failed.", ex);
+            }
             return new FeeSchedule { MakerRate = maker, TakerRate = taker, Notes = "from TradeVolume" };
         }
 
@@ -292,6 +317,7 @@ namespace CryptoDayTraderSuite.Exchanges
         {
             var json = await PrivatePostAsync("/0/private/Balance", new Dictionary<string, string>());
             var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+            EnsureNoKrakenErrors(obj, "balances");
             var d = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
             if (obj != null && obj.ContainsKey("result"))
@@ -318,8 +344,10 @@ namespace CryptoDayTraderSuite.Exchanges
 
         public async Task<List<OpenOrder>> GetOpenOrdersAsync(string productId = null)
         {
+            var normalizedFilterProduct = string.IsNullOrWhiteSpace(productId) ? string.Empty : NormalizeProduct(productId);
             var json = await PrivatePostAsync("/0/private/OpenOrders", new Dictionary<string, string>());
             var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+            EnsureNoKrakenErrors(obj, "open orders");
             var list = new List<OpenOrder>();
             
             if (obj != null && obj.ContainsKey("result"))
@@ -334,16 +362,46 @@ namespace CryptoDayTraderSuite.Exchanges
                         {
                             var orderMap = open[key] as Dictionary<string, object>;
                             if (orderMap == null) continue;
+                            if (string.IsNullOrWhiteSpace(key)) continue;
 
                             var desc = orderMap.ContainsKey("descr") ? orderMap["descr"] as Dictionary<string, object> : null;
                             var symbol = desc != null && desc.ContainsKey("pair") ? desc["pair"].ToString() : "";
+                            if (string.IsNullOrWhiteSpace(symbol))
+                            {
+                                continue;
+                            }
+                            var normalizedSymbol = string.IsNullOrWhiteSpace(symbol) ? string.Empty : NormalizeProduct(symbol);
+                            if (!string.IsNullOrWhiteSpace(normalizedFilterProduct)
+                                && !string.Equals(normalizedSymbol, normalizedFilterProduct, StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
                             var sideStr = desc != null && desc.ContainsKey("type") ? desc["type"].ToString() : "";
+                            if (!string.Equals(sideStr, "buy", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(sideStr, "sell", StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
                             var typeStr = desc != null && desc.ContainsKey("ordertype") ? desc["ordertype"].ToString() : "";
                             var priceStr = desc != null && desc.ContainsKey("price") ? desc["price"].ToString() : "0";
                             var volStr = orderMap.ContainsKey("vol") ? orderMap["vol"].ToString() : "0";
                             var filledStr = orderMap.ContainsKey("vol_exec") ? orderMap["vol_exec"].ToString() : "0";
-                            var statusStr = orderMap.ContainsKey("status") ? orderMap["status"].ToString() : "";
-                            var createdTime = orderMap.ContainsKey("opentm") ? Convert.ToDouble(orderMap["opentm"]) : 0.0;
+                            var statusStr = NormalizeOpenOrderStatus(orderMap.ContainsKey("status") ? orderMap["status"].ToString() : "");
+                            if (string.IsNullOrWhiteSpace(statusStr))
+                            {
+                                continue;
+                            }
+                            double createdTime;
+                            if (!orderMap.ContainsKey("opentm") || !TryParseDoubleInvariant(orderMap["opentm"], out createdTime))
+                            {
+                                continue;
+                            }
+
+                            DateTime createdUtc;
+                            if (!TryFromUnixSeconds((long)createdTime, out createdUtc))
+                            {
+                                continue;
+                            }
 
                             decimal price, vol, filled;
                             decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out price);
@@ -360,13 +418,42 @@ namespace CryptoDayTraderSuite.Exchanges
                                 Quantity = vol,
                                 FilledQty = filled,
                                 Status = statusStr,
-                                CreatedUtc = DateTimeOffset.FromUnixTimeSeconds((long)createdTime).UtcDateTime
+                                CreatedUtc = createdUtc
                             });
                         }
                     }
                 }
             }
             return list;
+        }
+
+        private static string NormalizeOpenOrderStatus(string rawStatus)
+        {
+            var status = string.IsNullOrWhiteSpace(rawStatus)
+                ? string.Empty
+                : rawStatus.Trim().ToUpperInvariant().Replace("-", "_").Replace(" ", "_");
+
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return string.Empty;
+            }
+
+            if (status.Contains("PARTIAL") && status.Contains("FILL"))
+            {
+                return "PARTIALLY_FILLED";
+            }
+
+            if (status == "NEW" || status == "OPEN" || status == "ACTIVE" || status == "WORKING" || status == "PENDING" || status == "RESTING" || status == "LIVE")
+            {
+                return "OPEN";
+            }
+
+            if (status == "PARTIALLY_FILLED")
+            {
+                return "PARTIALLY_FILLED";
+            }
+
+            return string.Empty;
         }
 
         public async Task<OrderResult> PlaceOrderAsync(OrderRequest req)
@@ -376,23 +463,80 @@ namespace CryptoDayTraderSuite.Exchanges
             form["type"] = req.Side == OrderSide.Buy ? "buy" : "sell";
             form["ordertype"] = req.Type == OrderType.Market ? "market" : "limit";
             form["volume"] = req.Quantity.ToString(CultureInfo.InvariantCulture);
-            if (req.Type == OrderType.Limit && req.Price.HasValue)
+            if (req.Type == OrderType.Limit)
+            {
+                if (!req.Price.HasValue || req.Price.Value <= 0m)
+                {
+                    throw new InvalidOperationException("Limit order requires positive price.");
+                }
+
                 form["price"] = req.Price.Value.ToString(CultureInfo.InvariantCulture);
+            }
 
             var json = await PrivatePostAsync("/0/private/AddOrder", form);
             var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
 
-            var accepted = !(obj.ContainsKey("error") && (obj["error"] as object[])?.Length > 0);
-            var id = "";
+            if (obj != null)
+            {
+                var precheckErrors = ReadObjectArray(obj, "error");
+                for (int i = 0; i < precheckErrors.Length; i++)
+                {
+                    var text = precheckErrors[i] == null ? string.Empty : precheckErrors[i].ToString();
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        return new OrderResult
+                        {
+                            OrderId = string.Empty,
+                            Accepted = false,
+                            Filled = false,
+                            FilledQty = 0m,
+                            AvgFillPrice = 0m,
+                            Message = text
+                        };
+                    }
+                }
+            }
+
+            if (obj == null)
+            {
+                return new OrderResult
+                {
+                    OrderId = string.Empty,
+                    Accepted = false,
+                    Filled = false,
+                    FilledQty = 0m,
+                    AvgFillPrice = 0m,
+                    Message = "empty response"
+                };
+            }
+
+            var id = string.Empty;
             if (obj.ContainsKey("result"))
             {
                 var res = obj["result"] as Dictionary<string, object>;
                 if (res != null)
                 {
-                    var tx = res["txid"] as object[];
+                    var tx = ReadObjectArray(res, "txid");
                     if (tx != null && tx.Length > 0) id = tx[0].ToString();
                 }
             }
+
+            var errors = ReadObjectArray(obj, "error");
+            var firstError = string.Empty;
+            for (int i = 0; i < errors.Length; i++)
+            {
+                var text = errors[i] == null ? string.Empty : errors[i].ToString();
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                firstError = text;
+                break;
+            }
+
+            var hasError = !string.IsNullOrWhiteSpace(firstError);
+            var accepted = !hasError && !string.IsNullOrWhiteSpace(id);
 
             return new OrderResult
             {
@@ -401,15 +545,98 @@ namespace CryptoDayTraderSuite.Exchanges
                 Filled = false,
                 FilledQty = 0m,
                 AvgFillPrice = 0m,
-                Message = accepted ? "accepted" : "error"
+                Message = accepted ? "accepted" : (string.IsNullOrWhiteSpace(firstError) ? "order rejected" : firstError)
             };
         }
 
         public async Task<bool> CancelOrderAsync(string orderId)
         {
+            if (string.IsNullOrWhiteSpace(orderId))
+            {
+                return false;
+            }
+
             var form = new Dictionary<string, string> { { "txid", orderId } };
-            var json = await PrivatePostAsync("/0/private/CancelOrder", form);
-            return json.Contains("count");
+            var json = await PrivatePostAsync("/0/private/CancelOrder", form).ConfigureAwait(false);
+            var root = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+            if (root == null)
+            {
+                return false;
+            }
+
+            var errors = ReadObjectArray(root, "error");
+            if (errors.Length > 0)
+            {
+                for (int i = 0; i < errors.Length; i++)
+                {
+                    if (!string.IsNullOrWhiteSpace(errors[i] == null ? string.Empty : errors[i].ToString()))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            var result = root.ContainsKey("result") ? root["result"] as Dictionary<string, object> : null;
+            if (result == null)
+            {
+                return false;
+            }
+
+            decimal count;
+            if (result.ContainsKey("count") && TryParseDecimalInvariant(result["count"], out count))
+            {
+                return count > 0m;
+            }
+
+            var pending = result.ContainsKey("pending") ? result["pending"] : null;
+            var pendingText = pending == null ? string.Empty : pending.ToString();
+            if (string.Equals(pendingText, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(pendingText, "1", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private void EnsureNoKrakenErrors(Dictionary<string, object> root, string operation)
+        {
+            if (root == null)
+            {
+                throw new InvalidOperationException("Kraken " + operation + " response was empty.");
+            }
+
+            var errors = ReadObjectArray(root, "error");
+            for (int i = 0; i < errors.Length; i++)
+            {
+                var text = errors[i] == null ? string.Empty : errors[i].ToString();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    throw new InvalidOperationException("Kraken " + operation + " failed: " + text);
+                }
+            }
+        }
+
+        private static object[] ReadObjectArray(Dictionary<string, object> map, string key)
+        {
+            if (map == null || string.IsNullOrWhiteSpace(key) || !map.ContainsKey(key) || map[key] == null)
+            {
+                return new object[0];
+            }
+
+            var typed = map[key] as object[];
+            if (typed != null)
+            {
+                return typed;
+            }
+
+            var list = map[key] as System.Collections.ArrayList;
+            if (list != null)
+            {
+                return list.ToArray();
+            }
+
+            return new object[0];
         }
 
         private bool TryParseDecimalInvariant(object raw, out decimal value)
@@ -432,6 +659,33 @@ namespace CryptoDayTraderSuite.Exchanges
             }
 
             return double.TryParse(raw.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+        }
+
+        private bool TryFromUnixSeconds(long seconds, out DateTime utc)
+        {
+            utc = DateTime.MinValue;
+            if (seconds <= 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                utc = DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime;
+                return true;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+        }
+
+        private void EnsureCredentials()
+        {
+            if (string.IsNullOrWhiteSpace(_key) || string.IsNullOrWhiteSpace(_secretBase64))
+            {
+                throw new InvalidOperationException("Kraken credentials are required.");
+            }
         }
     }
 }

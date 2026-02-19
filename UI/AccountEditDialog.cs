@@ -194,7 +194,11 @@ namespace CryptoDayTraderSuite.UI
 
             if (!HasRequiredCredentialInputs(policy))
             {
-                MessageBox.Show("Missing required credentials for " + service + ". Required: " + policy.RequiredSummary + ".", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    "Missing required credentials for " + service + ". Required: " + policy.RequiredSummary + ". Template: " + policy.TemplateSummary + ".",
+                    "Validation",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return null;
             }
 
@@ -286,8 +290,9 @@ namespace CryptoDayTraderSuite.UI
             if (lblCredHeader != null)
             {
                 var hint = GetGeoRoutingHint(service);
+                var template = policy.TemplateSummary;
                 lblCredHeader.Text = showCredentialSection
-                    ? ("Credentials Required: " + policy.RequiredSummary + (string.IsNullOrWhiteSpace(hint) ? string.Empty : " | " + hint))
+                    ? ("Credentials Required: " + policy.RequiredSummary + " | Template: " + template + (string.IsNullOrWhiteSpace(hint) ? string.Empty : " | " + hint))
                     : "Credentials";
             }
 

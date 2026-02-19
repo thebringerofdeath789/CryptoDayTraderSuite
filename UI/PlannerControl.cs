@@ -28,6 +28,18 @@ namespace CryptoDayTraderSuite.UI
         private List<ProjectionRow> _scanRows = new List<ProjectionRow>();
         private List<TradePlan> _queuedPlans = new List<TradePlan>();
 
+        private sealed class PlannerProposalDiagnosticsSummary
+        {
+            public readonly Dictionary<string, int> ReasonCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            public readonly HashSet<string> ChosenVenues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public readonly HashSet<string> AlternateVenues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public readonly HashSet<string> ExecutionModes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public int PolicyHealthBlockedCount;
+            public int RegimeBlockedCount;
+            public int CircuitBreakerObservedCount;
+            public int RoutingUnavailableCount;
+        }
+
         public PlannerControl()
         {
             InitializeComponent();
@@ -187,7 +199,8 @@ namespace CryptoDayTraderSuite.UI
             gridPlanned.Rows.Clear();
             foreach (var p in filtered)
             {
-                gridPlanned.Rows.Add(p.Enabled, p.Exchange, p.ProductId, p.Strategy, p.Side, p.Quantity, p.Price, p.EstEdge, p.Notes);
+                var rowIndex = gridPlanned.Rows.Add(p.Enabled, p.Exchange, p.ProductId, p.Strategy, p.Side, p.Quantity, p.Price, p.EstEdge, p.Notes);
+                gridPlanned.Rows[rowIndex].Tag = p;
             }
         }
 
@@ -208,7 +221,12 @@ namespace CryptoDayTraderSuite.UI
             for (int i = 0; i < gridPlanned.Rows.Count; i++)
             {
                 var row = gridPlanned.Rows[i];
-                var p = filtered[i];
+                var p = row.Tag as TradeRecord;
+                if (p == null)
+                {
+                    if (i < 0 || i >= filtered.Count) continue;
+                    p = filtered[i];
+                }
                 p.Enabled = Convert.ToBoolean(row.Cells[0].Value ?? false);
                 p.Quantity = Convert.ToDecimal(row.Cells[5].Value ?? 0m);
                 p.Price = Convert.ToDecimal(row.Cells[6].Value ?? 0m);
@@ -233,10 +251,15 @@ namespace CryptoDayTraderSuite.UI
         private void EditSelectedTrade()
         {
             if (gridPlanned.SelectedRows.Count == 0) return;
-            var idx = gridPlanned.SelectedRows[0].Index;
-            var filtered = GetFilteredPlanned();
-            if (idx < 0 || idx >= filtered.Count) return;
-            var rec = filtered[idx];
+            var row = gridPlanned.SelectedRows[0];
+            var rec = row.Tag as TradeRecord;
+            if (rec == null)
+            {
+                var idx = row.Index;
+                var filtered = GetFilteredPlanned();
+                if (idx < 0 || idx >= filtered.Count) return;
+                rec = filtered[idx];
+            }
             
             var dlg = new TradeEditDialog(rec);
             if (dlg.ShowDialog(this) == DialogResult.OK)
@@ -259,15 +282,24 @@ namespace CryptoDayTraderSuite.UI
         private void DeleteSelectedTrade()
         {
             if (gridPlanned.SelectedRows.Count == 0) return;
-            var filtered = GetFilteredPlanned();
-
             var records = gridPlanned.SelectedRows
                 .Cast<DataGridViewRow>()
-                .Select(r => r.Index)
-                .Where(i => i >= 0 && i < filtered.Count)
+                .Select(r => r.Tag as TradeRecord)
+                .Where(r => r != null)
                 .Distinct()
-                .Select(i => filtered[i])
                 .ToList();
+
+            if (records.Count == 0)
+            {
+                var filtered = GetFilteredPlanned();
+                records = gridPlanned.SelectedRows
+                    .Cast<DataGridViewRow>()
+                    .Select(r => r.Index)
+                    .Where(i => i >= 0 && i < filtered.Count)
+                    .Distinct()
+                    .Select(i => filtered[i])
+                    .ToList();
+            }
 
             if (records.Count == 0) return;
 
@@ -413,13 +445,15 @@ namespace CryptoDayTraderSuite.UI
                 // The service will filter/pick best strategy based on expectancy
                 var manualEquity = numEquity == null ? 1000m : numEquity.Value;
                 var resolvedEquity = await ResolveEquityForPlanningAsync(account, manualEquity, "Propose");
-                var plans = await _planner.ProposeAsync(account.Id, symbol, gran, resolvedEquity, account.RiskPerTradePct, _scanRows);
+                var diagnostics = await _planner.ProposeWithDiagnosticsAsync(account.Id, symbol, gran, resolvedEquity, account.RiskPerTradePct, _scanRows);
+                var plans = diagnostics != null ? (diagnostics.Plans ?? new List<TradePlan>()) : new List<TradePlan>();
                 _queuedPlans = plans ?? new List<TradePlan>();
+                var summary = BuildProposalDiagnosticsSummary(diagnostics, plans);
                 
                 if (plans == null || plans.Count == 0)
                 {
                     // Check logs for specific reason
-                    UpdatePlannerStatus("Propose complete: no active signal (No Signal/Risk Guard/AI Veto)", true);
+                    UpdatePlannerStatus("Propose complete: no active signal (No Signal/Risk Guard/AI Veto) | " + FormatProposalDiagnosticsSummary(summary), true);
                     return;
                 }
 
@@ -430,11 +464,11 @@ namespace CryptoDayTraderSuite.UI
                 {
                     _historyService?.SavePlannedTrades(_planned);
                     ApplyFilters(); // Refresh planned grid
-                    UpdatePlannerStatus($"Propose complete: {added} added, {duplicates} duplicate(s); {_queuedPlans.Count} queued for execute");
+                    UpdatePlannerStatus($"Propose complete: {added} added, {duplicates} duplicate(s); {_queuedPlans.Count} queued for execute | {FormatProposalDiagnosticsSummary(summary)}");
                 }
                 else
                 {
-                    UpdatePlannerStatus($"Propose complete: 0 added (duplicates); {_queuedPlans.Count} queued for execute", true);
+                    UpdatePlannerStatus($"Propose complete: 0 added (duplicates); {_queuedPlans.Count} queued for execute | {FormatProposalDiagnosticsSummary(summary)}", true);
                 }
             }
             catch (Exception ex)
@@ -501,6 +535,7 @@ namespace CryptoDayTraderSuite.UI
                 var manualEquity = numEquity == null ? 1000m : numEquity.Value;
                 var resolvedEquity = await ResolveEquityForPlanningAsync(account, manualEquity, "Propose All");
                 var allQueued = new List<TradePlan>();
+                var aggregateSummary = new PlannerProposalDiagnosticsSummary();
 
                 int scanned = 0;
                 int proposedSymbols = 0;
@@ -513,10 +548,13 @@ namespace CryptoDayTraderSuite.UI
                     scanned++;
                     if (rows == null || rows.Count == 0)
                     {
+                        IncrementReasonCount(aggregateSummary, "no-projection");
                         continue;
                     }
 
-                    var plans = await _planner.ProposeAsync(account.Id, symbol, gran, resolvedEquity, account.RiskPerTradePct, rows);
+                    var diagnostics = await _planner.ProposeWithDiagnosticsAsync(account.Id, symbol, gran, resolvedEquity, account.RiskPerTradePct, rows);
+                    var plans = diagnostics != null ? (diagnostics.Plans ?? new List<TradePlan>()) : new List<TradePlan>();
+                    MergeProposalDiagnosticsSummary(aggregateSummary, BuildProposalDiagnosticsSummary(diagnostics, plans));
                     if (plans == null || plans.Count == 0)
                     {
                         continue;
@@ -540,11 +578,11 @@ namespace CryptoDayTraderSuite.UI
 
                 if (_queuedPlans.Count == 0)
                 {
-                    UpdatePlannerStatus($"Propose All complete: no queued plans across {scanned} symbol(s)", true);
+                    UpdatePlannerStatus($"Propose All complete: no queued plans across {scanned} symbol(s) | {FormatProposalDiagnosticsSummary(aggregateSummary)}", true);
                     return;
                 }
 
-                UpdatePlannerStatus($"Propose All complete: {_queuedPlans.Count} queued across {proposedSymbols}/{scanned} symbol(s); {added} added, {duplicates} duplicate(s)");
+                UpdatePlannerStatus($"Propose All complete: {_queuedPlans.Count} queued across {proposedSymbols}/{scanned} symbol(s); {added} added, {duplicates} duplicate(s) | {FormatProposalDiagnosticsSummary(aggregateSummary)}");
             }
             catch (Exception ex)
             {
@@ -692,6 +730,114 @@ namespace CryptoDayTraderSuite.UI
             if (plan == null || plan.Entry <= 0m) return 0m;
             if (plan.Direction > 0) return (plan.Target - plan.Entry) / plan.Entry;
             return (plan.Entry - plan.Target) / plan.Entry;
+        }
+
+        private PlannerProposalDiagnosticsSummary BuildProposalDiagnosticsSummary(AutoPlannerService.ProposalDiagnostics diagnostics, IEnumerable<TradePlan> plans)
+        {
+            var summary = new PlannerProposalDiagnosticsSummary();
+            if (diagnostics != null && !string.IsNullOrWhiteSpace(diagnostics.ReasonCode))
+            {
+                IncrementReasonCount(summary, diagnostics.ReasonCode);
+            }
+
+            foreach (var plan in plans ?? Enumerable.Empty<TradePlan>())
+            {
+                var note = plan == null ? string.Empty : (plan.Note ?? string.Empty);
+
+                var chosen = ExtractBracketTagValue(note, "Route");
+                if (!string.IsNullOrWhiteSpace(chosen)) summary.ChosenVenues.Add(chosen.Trim());
+
+                var alternate = ExtractBracketTagValue(note, "Alt");
+                if (!string.IsNullOrWhiteSpace(alternate)) summary.AlternateVenues.Add(alternate.Trim());
+
+                var execMode = ExtractBracketTagValue(note, "ExecMode");
+                if (!string.IsNullOrWhiteSpace(execMode)) summary.ExecutionModes.Add(execMode.Trim());
+
+                var policyReason = ExtractBracketTagValue(note, "PolicyReason");
+                if (!string.IsNullOrWhiteSpace(policyReason)) summary.PolicyHealthBlockedCount++;
+
+                var regime = ExtractBracketTagValue(note, "Regime");
+                if (!string.IsNullOrWhiteSpace(regime) && !string.Equals(regime, "normal", StringComparison.OrdinalIgnoreCase)) summary.RegimeBlockedCount++;
+
+                var routeUnavailable = string.Equals(diagnostics != null ? diagnostics.ReasonCode : string.Empty, "routing-unavailable", StringComparison.OrdinalIgnoreCase);
+                if (routeUnavailable) summary.RoutingUnavailableCount++;
+            }
+
+            if (diagnostics != null)
+            {
+                var reasonCode = diagnostics.ReasonCode ?? string.Empty;
+                if (reasonCode.IndexOf("policy", StringComparison.OrdinalIgnoreCase) >= 0) summary.PolicyHealthBlockedCount++;
+                if (reasonCode.IndexOf("regime", StringComparison.OrdinalIgnoreCase) >= 0) summary.RegimeBlockedCount++;
+                if (reasonCode.IndexOf("circuit", StringComparison.OrdinalIgnoreCase) >= 0) summary.CircuitBreakerObservedCount++;
+                if (string.Equals(reasonCode, "routing-unavailable", StringComparison.OrdinalIgnoreCase)) summary.RoutingUnavailableCount++;
+            }
+
+            return summary;
+        }
+
+        private void MergeProposalDiagnosticsSummary(PlannerProposalDiagnosticsSummary target, PlannerProposalDiagnosticsSummary source)
+        {
+            if (target == null || source == null) return;
+
+            foreach (var key in source.ReasonCounts.Keys)
+            {
+                var value = source.ReasonCounts[key];
+                if (target.ReasonCounts.ContainsKey(key)) target.ReasonCounts[key] += value;
+                else target.ReasonCounts[key] = value;
+            }
+
+            foreach (var value in source.ChosenVenues) target.ChosenVenues.Add(value);
+            foreach (var value in source.AlternateVenues) target.AlternateVenues.Add(value);
+            foreach (var value in source.ExecutionModes) target.ExecutionModes.Add(value);
+
+            target.PolicyHealthBlockedCount += source.PolicyHealthBlockedCount;
+            target.RegimeBlockedCount += source.RegimeBlockedCount;
+            target.CircuitBreakerObservedCount += source.CircuitBreakerObservedCount;
+            target.RoutingUnavailableCount += source.RoutingUnavailableCount;
+        }
+
+        private string FormatProposalDiagnosticsSummary(PlannerProposalDiagnosticsSummary summary)
+        {
+            if (summary == null) return "routing=n/a | venueHealth policy=0 regime=0 circuit=0 route-unavail=0";
+
+            var route = summary.ChosenVenues.Count > 0 ? string.Join(",", summary.ChosenVenues.Take(2)) : "n/a";
+            var alt = summary.AlternateVenues.Count > 0 ? string.Join(",", summary.AlternateVenues.Take(2)) : "n/a";
+            var exec = summary.ExecutionModes.Count > 0 ? string.Join(",", summary.ExecutionModes.Take(2)) : "n/a";
+
+            var topReason = "none";
+            if (summary.ReasonCounts.Count > 0)
+            {
+                var pair = summary.ReasonCounts.OrderByDescending(kv => kv.Value).First();
+                topReason = pair.Key + "=" + pair.Value;
+            }
+
+            return "routing chosen=" + route + " alt=" + alt + " exec=" + exec
+                + " | venueHealth policy=" + summary.PolicyHealthBlockedCount + " regime=" + summary.RegimeBlockedCount + " circuit=" + summary.CircuitBreakerObservedCount + " route-unavail=" + summary.RoutingUnavailableCount
+                + " | reject=" + topReason;
+        }
+
+        private void IncrementReasonCount(PlannerProposalDiagnosticsSummary summary, string reasonCode)
+        {
+            if (summary == null || string.IsNullOrWhiteSpace(reasonCode)) return;
+
+            var key = reasonCode.Trim();
+            if (summary.ReasonCounts.ContainsKey(key)) summary.ReasonCounts[key]++;
+            else summary.ReasonCounts[key] = 1;
+        }
+
+        private string ExtractBracketTagValue(string text, string key)
+        {
+            if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(key)) return string.Empty;
+
+            var token = "[" + key + "=";
+            var start = text.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+            if (start < 0) return string.Empty;
+
+            start += token.Length;
+            var end = text.IndexOf(']', start);
+            if (end <= start) return string.Empty;
+
+            return text.Substring(start, end - start).Trim();
         }
     }
 }

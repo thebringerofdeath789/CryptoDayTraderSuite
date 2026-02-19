@@ -373,18 +373,38 @@ namespace CryptoDayTraderSuite
                         return;
                     }
 
-                    var broker = (cmbExchange != null && cmbExchange.SelectedItem != null)
+                    var selectedBroker = (cmbExchange != null && cmbExchange.SelectedItem != null)
                         ? cmbExchange.SelectedItem.ToString()
                         : "Coinbase";
+                    var broker = NormalizeLegacyExchangeServiceAlias(selectedBroker);
                     var label = "Manual";
+
+                    var apiKey = txtApiKey != null ? txtApiKey.Text.Trim() : string.Empty;
+                    var secret = txtSecret != null ? txtSecret.Text.Trim() : string.Empty;
+                    var extra = txtExtra != null ? txtExtra.Text.Trim() : string.Empty;
+                    var policy = ExchangeCredentialPolicy.ForService(broker);
+
+                    if (policy.RequiresApiKey && string.IsNullOrWhiteSpace(apiKey)
+                        || policy.RequiresApiSecret && string.IsNullOrWhiteSpace(secret)
+                        || policy.RequiresPassphrase && string.IsNullOrWhiteSpace(extra)
+                        || policy.RequiresApiKeyName
+                        || policy.RequiresEcPrivateKeyPem)
+                    {
+                        MessageBox.Show(
+                            "Missing required credentials for " + broker + ". Required: " + policy.RequiredSummary + ". Template: " + policy.TemplateSummary + ".",
+                            "Validation",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                        return;
+                    }
 
                     var keyInfo = new KeyInfo
                     {
                         Broker = broker,
                         Label = label,
-                        ApiKey = txtApiKey != null ? txtApiKey.Text.Trim() : string.Empty,
-                        Secret = txtSecret != null ? txtSecret.Text.Trim() : string.Empty,
-                        Passphrase = txtExtra != null ? txtExtra.Text.Trim() : string.Empty,
+                        ApiKey = apiKey,
+                        Secret = secret,
+                        Passphrase = extra,
                         CreatedUtc = DateTime.UtcNow,
                         Enabled = true,
                         Active = true,
@@ -400,6 +420,30 @@ namespace CryptoDayTraderSuite
                     Log("error saving keys " + ex.Message);
                 }
             }
+
+        private string NormalizeLegacyExchangeServiceAlias(string service)
+        {
+            var normalized = (service ?? string.Empty).Trim().ToLowerInvariant();
+            switch (normalized)
+            {
+                case "coinbase":
+                    return "coinbase-advanced";
+                case "binance-us":
+                    return "binance-us";
+                case "binance-global":
+                    return "binance-global";
+                case "bybit-global":
+                    return "bybit-global";
+                case "okx-global":
+                    return "okx-global";
+                case "kraken":
+                    return "kraken";
+                case "bitstamp":
+                    return "bitstamp";
+                default:
+                    return string.IsNullOrWhiteSpace(normalized) ? "coinbase-advanced" : normalized;
+            }
+        }
 
         private void BuildModernLayout()
         {

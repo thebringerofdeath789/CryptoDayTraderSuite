@@ -209,6 +209,14 @@ namespace CryptoDayTraderSuite.UI
 
 			public List<string> ExecutionModes = new List<string>();
 
+			public List<string> FeeBpsValues = new List<string>();
+
+			public List<string> SlipBpsValues = new List<string>();
+
+			public List<string> NetEdgeValues = new List<string>();
+
+			public List<string> ConfidenceValues = new List<string>();
+
 			public int RoutingUnavailableCount;
 
 			public int PolicyHealthBlockedCount;
@@ -303,6 +311,14 @@ namespace CryptoDayTraderSuite.UI
 		private string _lastRoutingSummaryText = "Routing: n/a";
 
 		private string _lastVenueHealthSummaryText = "Venue Health: n/a";
+
+		private string _lastRoutingChosenSummaryText = "Chosen Venue: n/a";
+
+		private string _lastRoutingAlternatesSummaryText = "Alternates: n/a";
+
+		private string _lastCircuitSummaryText = "Circuit State: n/a";
+
+		private string _lastRoutingRationaleSummaryText = "Rationale: n/a";
 
 
 		public AutoModeControl()
@@ -743,6 +759,26 @@ namespace CryptoDayTraderSuite.UI
                         {
                             batch.ExecutionModes.Add(execMode);
                         }
+						string feeBps = ExtractBracketTagValue(plan.Note, "FeeBps");
+						if (!string.IsNullOrWhiteSpace(feeBps))
+						{
+							batch.FeeBpsValues.Add(feeBps);
+						}
+						string slipBps = ExtractBracketTagValue(plan.Note, "SlipBps");
+						if (!string.IsNullOrWhiteSpace(slipBps))
+						{
+							batch.SlipBpsValues.Add(slipBps);
+						}
+						string netEdge = ExtractBracketTagValue(plan.Note, "NetEdge");
+						if (!string.IsNullOrWhiteSpace(netEdge))
+						{
+							batch.NetEdgeValues.Add(netEdge);
+						}
+						string confidence = ExtractBracketTagValue(plan.Note, "Confidence");
+						if (!string.IsNullOrWhiteSpace(confidence))
+						{
+							batch.ConfidenceValues.Add(confidence);
+						}
                     }
                 }
 				string reason = ((diag == null || string.IsNullOrWhiteSpace(diag.ReasonCode)) ? "unknown" : diag.ReasonCode);
@@ -813,6 +849,36 @@ namespace CryptoDayTraderSuite.UI
             return prefix + ": " + string.Join(", ", head) + more;
         }
 
+		private void ResetRoutingDiagnosticsFooterState()
+		{
+			_lastRoutingSummaryText = "Routing: n/a";
+			_lastVenueHealthSummaryText = "Venue Health: n/a";
+			_lastRoutingChosenSummaryText = "Chosen Venue: n/a";
+			_lastRoutingAlternatesSummaryText = "Alternates: n/a";
+			_lastCircuitSummaryText = "Circuit State: n/a";
+			_lastRoutingRationaleSummaryText = "Rationale: n/a";
+		}
+
+		private void ApplyRoutingDiagnosticsFooterState()
+		{
+			if (lblRoutingChosenVenue != null)
+			{
+				lblRoutingChosenVenue.Text = _lastRoutingChosenSummaryText;
+			}
+			if (lblRoutingAlternates != null)
+			{
+				lblRoutingAlternates.Text = _lastRoutingAlternatesSummaryText;
+			}
+			if (lblCircuitState != null)
+			{
+				lblCircuitState.Text = _lastCircuitSummaryText;
+			}
+			if (lblRoutingRationale != null)
+			{
+				lblRoutingRationale.Text = _lastRoutingRationaleSummaryText;
+			}
+		}
+
         private void UpdateRoutingVenueFooterFromBatch(ProposalBatchResult batch)
         {
             if (batch == null)
@@ -822,8 +888,17 @@ namespace CryptoDayTraderSuite.UI
             string chosenCsv = string.Join(", ", (batch.ChosenVenues ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
             string alternateCsv = string.Join(", ", (batch.AlternateVenues ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
             string modeCsv = string.Join(", ", (batch.ExecutionModes ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+			string feeBpsCsv = string.Join(", ", (batch.FeeBpsValues ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+			string slipBpsCsv = string.Join(", ", (batch.SlipBpsValues ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+			string netEdgeCsv = string.Join(", ", (batch.NetEdgeValues ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
+			string confidenceCsv = string.Join(", ", (batch.ConfidenceValues ?? new List<string>()).Where((string v) => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase));
             _lastRoutingSummaryText = SummarizeList("Routing", chosenCsv, 3) + " | " + SummarizeList("Alt", alternateCsv, 3) + " | " + SummarizeList("Exec", modeCsv, 3);
             _lastVenueHealthSummaryText = "Venue Health: policy=" + batch.PolicyHealthBlockedCount + ", regime=" + batch.RegimeBlockedCount + ", circuit=" + batch.CircuitBreakerObservedCount + ", routing-unavail=" + batch.RoutingUnavailableCount;
+			_lastRoutingChosenSummaryText = SummarizeList("Chosen Venue", chosenCsv, 3);
+			_lastRoutingAlternatesSummaryText = SummarizeList("Alternates", alternateCsv, 3);
+			_lastCircuitSummaryText = "Circuit State: policy=" + batch.PolicyHealthBlockedCount + ", regime=" + batch.RegimeBlockedCount + ", circuit=" + batch.CircuitBreakerObservedCount + ", routing-unavail=" + batch.RoutingUnavailableCount;
+			_lastRoutingRationaleSummaryText = SummarizeList("Exec", modeCsv, 2) + " | " + SummarizeList("FeeBps", feeBpsCsv, 2) + " | " + SummarizeList("SlipBps", slipBpsCsv, 2) + " | " + SummarizeList("NetEdge", netEdgeCsv, 2) + " | " + SummarizeList("Conf", confidenceCsv, 2);
+			ApplyRoutingDiagnosticsFooterState();
         }
 
         private Dictionary<string, int> CreateRejectCategoryCounter()
@@ -1156,19 +1231,6 @@ namespace CryptoDayTraderSuite.UI
 							cycleTelemetry.Profiles.Add(profileTelemetry);
 							continue;
 						}
-						AccountInfo account = (_accounts ?? new List<AccountInfo>()).FirstOrDefault((AccountInfo a) => string.Equals(a.Id, profile.AccountId, StringComparison.OrdinalIgnoreCase) && a.Enabled);
-						if (account == null)
-						{
-							cycleStats.Add(profile.Name + ": skipped(account)");
-							profileTelemetry.Status = "skipped";
-							profileTelemetry.Reason = "account";
-							profileTelemetry.EndedUtc = DateTime.UtcNow;
-							cycleTelemetry.Profiles.Add(profileTelemetry);
-							continue;
-						}
-						profileTelemetry.AccountLabel = account.Label;
-						profileTelemetry.Service = account.Service;
-						profileTelemetry.Mode = account.Mode.ToString();
 						profileTelemetry.PairScope = profile.PairScope;
 						profileTelemetry.MaxTradesPerCycle = profile.MaxTradesPerCycle;
 						profileTelemetry.CooldownMinutes = profile.CooldownMinutes;
@@ -1190,6 +1252,19 @@ namespace CryptoDayTraderSuite.UI
 							cycleTelemetry.Profiles.Add(profileTelemetry);
 							continue;
 						}
+						AccountInfo account = (_accounts ?? new List<AccountInfo>()).FirstOrDefault((AccountInfo a) => string.Equals(a.Id, profile.AccountId, StringComparison.OrdinalIgnoreCase) && a.Enabled);
+						if (account == null)
+						{
+							cycleStats.Add(profile.Name + ": blocked(account)");
+							profileTelemetry.Status = "blocked";
+							profileTelemetry.Reason = "account";
+							profileTelemetry.EndedUtc = DateTime.UtcNow;
+							cycleTelemetry.Profiles.Add(profileTelemetry);
+							continue;
+						}
+						profileTelemetry.AccountLabel = account.Label;
+						profileTelemetry.Service = account.Service;
+						profileTelemetry.Mode = account.Mode.ToString();
 						int gran = ParseGranularityMinutes();
 						int lookbackDays = ((numLookback != null) ? ((int)numLookback.Value) : 30);
 						List<ProjectionRow> rows2 = await ScanSymbolsAsync(symbols, gran, lookbackDays);
@@ -2703,6 +2778,8 @@ namespace CryptoDayTraderSuite.UI
 				{
 					lblTelemetrySummary.Text = "Telemetry: no cycle reports";
 					lblTelemetrySummary.ForeColor = Color.DimGray;
+					ResetRoutingDiagnosticsFooterState();
+					ApplyRoutingDiagnosticsFooterState();
 					return;
 				}
 				FileInfo latest = (from f in new DirectoryInfo(root).GetFiles("cycle_*.json")
@@ -2712,6 +2789,8 @@ namespace CryptoDayTraderSuite.UI
 				{
 					lblTelemetrySummary.Text = "Telemetry: no cycle reports";
 					lblTelemetrySummary.ForeColor = Color.DimGray;
+					ResetRoutingDiagnosticsFooterState();
+					ApplyRoutingDiagnosticsFooterState();
 					return;
 				}
 				string json = File.ReadAllText(latest.FullName);
@@ -2721,10 +2800,17 @@ namespace CryptoDayTraderSuite.UI
 				{
 					lblTelemetrySummary.Text = "Telemetry: latest report unreadable";
 					lblTelemetrySummary.ForeColor = Color.DarkOrange;
+					ResetRoutingDiagnosticsFooterState();
+					ApplyRoutingDiagnosticsFooterState();
 					return;
 				}
 				_lastRoutingSummaryText = SummarizeList("Routing", telemetry.RoutingChosenVenues, 3) + " | " + SummarizeList("Alt", telemetry.RoutingAlternateVenues, 3) + " | " + SummarizeList("Exec", telemetry.RoutingExecutionModes, 3);
                 _lastVenueHealthSummaryText = "Venue Health: policy=" + telemetry.PolicyHealthBlockedCount + ", regime=" + telemetry.RegimeBlockedCount + ", circuit=" + telemetry.CircuitBreakerObservedCount + ", routing-unavail=" + telemetry.RoutingUnavailableCount;
+                _lastRoutingChosenSummaryText = SummarizeList("Chosen Venue", telemetry.RoutingChosenVenues, 3);
+                _lastRoutingAlternatesSummaryText = SummarizeList("Alternates", telemetry.RoutingAlternateVenues, 3);
+                _lastCircuitSummaryText = "Circuit State: policy=" + telemetry.PolicyHealthBlockedCount + ", regime=" + telemetry.RegimeBlockedCount + ", circuit=" + telemetry.CircuitBreakerObservedCount + ", routing-unavail=" + telemetry.RoutingUnavailableCount;
+                _lastRoutingRationaleSummaryText = SummarizeList("Exec", telemetry.RoutingExecutionModes, 3) + " | FeeBps: n/a | SlipBps: n/a | NetEdge: n/a | Conf: n/a";
+                ApplyRoutingDiagnosticsFooterState();
                 lblTelemetrySummary.Text = string.Format("Telemetry: {0} | profiles {1}/{2} | executed {3} | blocked {4} | gates {5} (no-signal:{6}, ai-veto:{7}, risk-veto:{8}, success:{9}) | matrix {10} (guardrails:{11}, containment:{12}, coverage:{13}) | {14} | {15} | {16}", latest.Name, telemetry.ProcessedProfileCount, telemetry.EnabledProfileCount, telemetry.ExecutedProfiles, telemetry.FailedProfiles, string.IsNullOrWhiteSpace(telemetry.GateStatus) ? "n/a" : telemetry.GateStatus, telemetry.GateNoSignalObserved ? "obs" : "na", telemetry.GateAiVetoObserved ? "obs" : "na", telemetry.GateRiskVetoObserved ? "obs" : "na", telemetry.GateSuccessObserved ? "obs" : "na", string.IsNullOrWhiteSpace(telemetry.MatrixStatus) ? "n/a" : telemetry.MatrixStatus, telemetry.MatrixIndependentGuardrailsObserved ? "obs" : "na", telemetry.MatrixFailureContainmentObserved ? "obs" : "na", telemetry.MatrixMinimumProfileCoverage ? "obs" : "na", (telemetry.EndedUtc == default(DateTime)) ? "pending" : telemetry.EndedUtc.ToLocalTime().ToString("HH:mm:ss"), _lastRoutingSummaryText, _lastVenueHealthSummaryText);
 				lblTelemetrySummary.ForeColor = ((telemetry.FailedProfiles > 0 || !string.Equals(telemetry.MatrixStatus, "PASS", StringComparison.OrdinalIgnoreCase) || !string.Equals(telemetry.GateStatus, "PASS", StringComparison.OrdinalIgnoreCase)) ? Color.DarkOrange : Color.DarkGreen);
 			}
@@ -2732,6 +2818,8 @@ namespace CryptoDayTraderSuite.UI
 			{
 				lblTelemetrySummary.Text = "Telemetry: read failed";
 				lblTelemetrySummary.ForeColor = Color.DarkOrange;
+				ResetRoutingDiagnosticsFooterState();
+				ApplyRoutingDiagnosticsFooterState();
 				Log.Warn("[AutoMode] Telemetry summary refresh failed: " + ex.Message, "RefreshLatestTelemetrySummary", "C:\\Users\\admin\\Documents\\Visual Studio 2022\\Projects\\CryptoDayTraderSuite\\UI\\AutoModeControl.cs", 2079);
 			}
 		}

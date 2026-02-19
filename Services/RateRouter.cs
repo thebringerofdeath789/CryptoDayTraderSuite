@@ -31,12 +31,6 @@ namespace CryptoDayTraderSuite.Services
             _multiVenueQuoteService = multiVenueQuoteService ?? new MultiVenueQuoteService(_provider);
         }
 
-        public decimal Mid(string baseAsset, string quoteAsset)
-        {
-            /* Sync-over-async Wrapper: Use with caution. Ideally migrate to Async. */
-            return MidAsync(baseAsset, quoteAsset).GetAwaiter().GetResult();
-        }
-
         public async Task<decimal> MidAsync(string baseAsset, string quoteAsset)
         {
             var pid = $"{baseAsset}-{quoteAsset}";
@@ -94,11 +88,6 @@ namespace CryptoDayTraderSuite.Services
             }
             
             return 0m;
-        }
-
-        public decimal Convert(string fromAsset, string toAsset, decimal amount)
-        {
-            return ConvertAsync(fromAsset, toAsset, amount).GetAwaiter().GetResult();
         }
 
         public async Task<decimal> ConvertAsync(string fromAsset, string toAsset, decimal amount)

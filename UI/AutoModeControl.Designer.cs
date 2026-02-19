@@ -81,6 +81,10 @@ namespace CryptoDayTraderSuite.UI
             this.footerPanel = new System.Windows.Forms.TableLayoutPanel();
             this.lblProfileSummary = new System.Windows.Forms.Label();
             this.lblTelemetrySummary = new System.Windows.Forms.Label();
+            this.lblRoutingChosenVenue = new System.Windows.Forms.Label();
+            this.lblRoutingAlternates = new System.Windows.Forms.Label();
+            this.lblCircuitState = new System.Windows.Forms.Label();
+            this.lblRoutingRationale = new System.Windows.Forms.Label();
             this.tableLayout.SuspendLayout();
             this.headerPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numProfileInterval)).BeginInit();
@@ -747,13 +751,21 @@ namespace CryptoDayTraderSuite.UI
             this.footerPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.footerPanel.Controls.Add(this.lblProfileSummary, 0, 0);
             this.footerPanel.Controls.Add(this.lblTelemetrySummary, 0, 1);
+            this.footerPanel.Controls.Add(this.lblRoutingChosenVenue, 0, 2);
+            this.footerPanel.Controls.Add(this.lblRoutingAlternates, 0, 3);
+            this.footerPanel.Controls.Add(this.lblCircuitState, 0, 4);
+            this.footerPanel.Controls.Add(this.lblRoutingRationale, 0, 5);
             this.footerPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.footerPanel.Location = new System.Drawing.Point(3, 697);
             this.footerPanel.Name = "footerPanel";
-            this.footerPanel.RowCount = 2;
+            this.footerPanel.RowCount = 6;
             this.footerPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.footerPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
-            this.footerPanel.Size = new System.Drawing.Size(824, 44);
+            this.footerPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.footerPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.footerPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.footerPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.footerPanel.Size = new System.Drawing.Size(824, 83);
             this.footerPanel.TabIndex = 2;
             // 
             // lblProfileSummary
@@ -774,6 +786,46 @@ namespace CryptoDayTraderSuite.UI
             this.lblTelemetrySummary.Size = new System.Drawing.Size(142, 13);
             this.lblTelemetrySummary.TabIndex = 1;
             this.lblTelemetrySummary.Text = "Telemetry: no cycle reports";
+            // 
+            // lblRoutingChosenVenue
+            // 
+            this.lblRoutingChosenVenue.AutoSize = true;
+            this.lblRoutingChosenVenue.ForeColor = System.Drawing.Color.DimGray;
+            this.lblRoutingChosenVenue.Location = new System.Drawing.Point(3, 26);
+            this.lblRoutingChosenVenue.Name = "lblRoutingChosenVenue";
+            this.lblRoutingChosenVenue.Size = new System.Drawing.Size(84, 13);
+            this.lblRoutingChosenVenue.TabIndex = 2;
+            this.lblRoutingChosenVenue.Text = "Chosen Venue: n/a";
+            // 
+            // lblRoutingAlternates
+            // 
+            this.lblRoutingAlternates.AutoSize = true;
+            this.lblRoutingAlternates.ForeColor = System.Drawing.Color.DimGray;
+            this.lblRoutingAlternates.Location = new System.Drawing.Point(3, 39);
+            this.lblRoutingAlternates.Name = "lblRoutingAlternates";
+            this.lblRoutingAlternates.Size = new System.Drawing.Size(75, 13);
+            this.lblRoutingAlternates.TabIndex = 3;
+            this.lblRoutingAlternates.Text = "Alternates: n/a";
+            // 
+            // lblCircuitState
+            // 
+            this.lblCircuitState.AutoSize = true;
+            this.lblCircuitState.ForeColor = System.Drawing.Color.DimGray;
+            this.lblCircuitState.Location = new System.Drawing.Point(3, 52);
+            this.lblCircuitState.Name = "lblCircuitState";
+            this.lblCircuitState.Size = new System.Drawing.Size(76, 13);
+            this.lblCircuitState.TabIndex = 4;
+            this.lblCircuitState.Text = "Circuit State: n/a";
+            // 
+            // lblRoutingRationale
+            // 
+            this.lblRoutingRationale.AutoSize = true;
+            this.lblRoutingRationale.ForeColor = System.Drawing.Color.DimGray;
+            this.lblRoutingRationale.Location = new System.Drawing.Point(3, 65);
+            this.lblRoutingRationale.Name = "lblRoutingRationale";
+            this.lblRoutingRationale.Size = new System.Drawing.Size(69, 13);
+            this.lblRoutingRationale.TabIndex = 5;
+            this.lblRoutingRationale.Text = "Rationale: n/a";
             // 
             // AutoModeControl
             // 
@@ -864,5 +916,9 @@ namespace CryptoDayTraderSuite.UI
         private System.Windows.Forms.TableLayoutPanel footerPanel;
         private System.Windows.Forms.Label lblProfileSummary;
         private System.Windows.Forms.Label lblTelemetrySummary;
+        private System.Windows.Forms.Label lblRoutingChosenVenue;
+        private System.Windows.Forms.Label lblRoutingAlternates;
+        private System.Windows.Forms.Label lblCircuitState;
+        private System.Windows.Forms.Label lblRoutingRationale;
     }
 }

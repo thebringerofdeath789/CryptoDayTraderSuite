@@ -152,10 +152,10 @@ namespace CryptoDayTraderSuite.Brokers
                 };
 
                 var result = await client.PlaceOrderAsync(order).ConfigureAwait(false);
-                if (result == null) return (false, BuildFailureMessage("place", null, "empty order result"));
-                if (!result.Accepted) return (false, BuildFailureMessage("rejected", result.Message, "order rejected"));
+                if (result == null) return (false, BuildFailureMessage("place-response", null, "empty order result"));
+                if (!result.Accepted) return (false, BuildFailureMessage("place-rejected", result.Message, "order rejected"));
 
-                return (true, BuildSuccessMessage("accepted", "order=" + (result.OrderId ?? "(unknown)")));
+                return (true, BuildSuccessMessage("place-accepted", "order=" + (result.OrderId ?? "(unknown)")));
             }
             catch (Exception ex)
             {
@@ -242,30 +242,40 @@ namespace CryptoDayTraderSuite.Brokers
 
         private BinanceClient CreateClient(string accountId)
         {
-            var key = ResolveKey("binance", accountId);
+            var service = ResolveServiceForAccount(accountId, "binance");
+            var key = ResolveKey(service, accountId);
             var apiKey = UnprotectOrRaw(key.ApiKey);
             var secret = UnprotectOrRaw(!string.IsNullOrWhiteSpace(key.ApiSecretBase64) ? key.ApiSecretBase64 : key.Secret);
             if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(secret))
                 throw new InvalidOperationException("incomplete binance credentials");
 
-            var restBaseUrl = ResolveBinanceRestBaseUrlForAccount(accountId);
+            var restBaseUrl = ResolveBinanceRestBaseUrlForService(service);
             return new BinanceClient(apiKey, secret, restBaseUrl);
         }
 
-        private string ResolveBinanceRestBaseUrlForAccount(string accountId)
+        private string ResolveServiceForAccount(string accountId, string fallback)
         {
             if (string.IsNullOrWhiteSpace(accountId))
             {
-                return null;
+                return fallback;
             }
 
             var account = _accountService.Get(accountId);
             if (account == null || string.IsNullOrWhiteSpace(account.Service))
             {
+                return fallback;
+            }
+
+            return account.Service.Trim();
+        }
+
+        private string ResolveBinanceRestBaseUrlForService(string service)
+        {
+            if (string.IsNullOrWhiteSpace(service))
+            {
                 return null;
             }
 
-            var service = account.Service.Trim().ToLowerInvariant();
             if (string.Equals(service, "binance-us", StringComparison.OrdinalIgnoreCase))
             {
                 return "https://api.binance.us";
@@ -284,6 +294,10 @@ namespace CryptoDayTraderSuite.Brokers
             var account = !string.IsNullOrWhiteSpace(accountId) ? _accountService.Get(accountId) : null;
             var keyId = account != null ? account.KeyEntryId : null;
             if (string.IsNullOrWhiteSpace(keyId)) keyId = _keyService.GetActiveId(service);
+            if (string.IsNullOrWhiteSpace(keyId) && string.Equals(service, "binance-global", StringComparison.OrdinalIgnoreCase)) keyId = _keyService.GetActiveId("binance");
+            if (string.IsNullOrWhiteSpace(keyId) && string.Equals(service, "binance", StringComparison.OrdinalIgnoreCase)) keyId = _keyService.GetActiveId("binance-global");
+            if (string.IsNullOrWhiteSpace(keyId) && string.Equals(service, "binance-us", StringComparison.OrdinalIgnoreCase)) keyId = _keyService.GetActiveId("binance");
+            if (string.IsNullOrWhiteSpace(keyId) && string.Equals(service, "binance", StringComparison.OrdinalIgnoreCase)) keyId = _keyService.GetActiveId("binance-us");
             if (string.IsNullOrWhiteSpace(keyId)) throw new InvalidOperationException("no active " + service + " key selected");
             var key = _keyService.Get(keyId);
             if (key == null) throw new InvalidOperationException("active " + service + " key not found");

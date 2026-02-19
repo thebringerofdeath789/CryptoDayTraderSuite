@@ -88,6 +88,11 @@ namespace CryptoDayTraderSuite.Exchanges
             return await HttpUtil.RetryAsync(async () =>
             {
                 var symbol = NormalizeProduct(productId);
+                if (string.IsNullOrWhiteSpace(symbol))
+                {
+                    throw new InvalidOperationException("Binance candle request requires a valid symbol.");
+                }
+
                 var interval = NormalizeInterval(granularity);
                 var startMs = ToUnixMs(startUtc);
                 var endMs = ToUnixMs(endUtc);
@@ -111,6 +116,18 @@ namespace CryptoDayTraderSuite.Exchanges
 
                     var json = await HttpUtil.GetAsync(url).ConfigureAwait(false);
                     var data = UtilCompat.JsonDeserialize<object[]>(json);
+                    if (data == null)
+                    {
+                        var errorObj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+                        string apiError;
+                        if (IsBinanceApiError(errorObj, out apiError))
+                        {
+                            throw new InvalidOperationException("Binance candle request failed: " + apiError);
+                        }
+
+                        break;
+                    }
+
                     if (data == null || data.Length == 0)
                     {
                         break;
@@ -125,17 +142,33 @@ namespace CryptoDayTraderSuite.Exchanges
                         var openTimeMs = ToLong(row[0]);
                         if (openTimeMs > maxOpenTimeMs) maxOpenTimeMs = openTimeMs;
 
-                        var ts = FromUnixMs(openTimeMs);
+                        DateTime ts;
+                        if (!TryFromUnixMilliseconds(openTimeMs, out ts))
+                        {
+                            continue;
+                        }
+
                         if (ts < startUtc || ts > endUtc) continue;
+
+                        decimal open;
+                        decimal high;
+                        decimal low;
+                        decimal close;
+                        decimal volume;
+                        if (!TryParseDecimal(row[1], out open)) continue;
+                        if (!TryParseDecimal(row[2], out high)) continue;
+                        if (!TryParseDecimal(row[3], out low)) continue;
+                        if (!TryParseDecimal(row[4], out close)) continue;
+                        if (!TryParseDecimal(row[5], out volume)) continue;
 
                         list.Add(new Candle
                         {
                             Time = ts,
-                            Open = ToDecimal(row[1]),
-                            High = ToDecimal(row[2]),
-                            Low = ToDecimal(row[3]),
-                            Close = ToDecimal(row[4]),
-                            Volume = ToDecimal(row[5])
+                            Open = open,
+                            High = high,
+                            Low = low,
+                            Close = close,
+                            Volume = volume
                         });
                     }
 
@@ -182,6 +215,12 @@ namespace CryptoDayTraderSuite.Exchanges
                     obj = new Dictionary<string, object>();
                 }
 
+                string tickerError;
+                if (IsBinanceApiError(obj, out tickerError))
+                {
+                    throw new InvalidOperationException("Binance ticker request failed: " + tickerError);
+                }
+
                 var bid = ToDecimal(GetString(obj, "bidPrice"));
                 var ask = ToDecimal(GetString(obj, "askPrice"));
                 decimal last = 0m;
@@ -194,6 +233,12 @@ namespace CryptoDayTraderSuite.Exchanges
                 {
                     var priceJson = await HttpUtil.GetAsync(_restBaseUrl + "/api/v3/ticker/price?symbol=" + Uri.EscapeDataString(symbol)).ConfigureAwait(false);
                     var priceObj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(priceJson);
+                    string priceError;
+                    if (IsBinanceApiError(priceObj, out priceError))
+                    {
+                        throw new InvalidOperationException("Binance ticker price request failed: " + priceError);
+                    }
+
                     last = ToDecimal(GetString(priceObj, "price"));
                 }
 
@@ -259,6 +304,16 @@ namespace CryptoDayTraderSuite.Exchanges
                         };
                     }
                 }
+
+                if (arr == null)
+                {
+                    var errorObj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+                    string feeError;
+                    if (IsBinanceApiError(errorObj, out feeError))
+                    {
+                        throw new InvalidOperationException("Binance fee request failed: " + feeError);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -282,6 +337,11 @@ namespace CryptoDayTraderSuite.Exchanges
 
             var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
             var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
+            string balanceError;
+            if (IsBinanceApiError(obj, out balanceError))
+            {
+                throw new InvalidOperationException("Binance account balance request failed: " + balanceError);
+            }
 
             var balances = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             var rows = ToObjectArray(obj.ContainsKey("balances") ? obj["balances"] : null);
@@ -341,9 +401,24 @@ namespace CryptoDayTraderSuite.Exchanges
 
             var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
             var obj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
+            string placeError;
+            if (IsBinanceApiError(obj, out placeError))
+            {
+                return new OrderResult
+                {
+                    OrderId = string.Empty,
+                    Accepted = false,
+                    Filled = false,
+                    FilledQty = 0m,
+                    AvgFillPrice = 0m,
+                    Message = placeError
+                };
+            }
 
             var orderId = GetString(obj, "orderId");
             var status = GetString(obj, "status");
+            var statusUpper = string.IsNullOrWhiteSpace(status) ? string.Empty : status.Trim().ToUpperInvariant();
+            var rejected = statusUpper.Contains("REJECT") || statusUpper.Contains("EXPIRE") || statusUpper.Contains("CANCEL") || statusUpper.Contains("FAIL");
             var executedQty = ToDecimal(GetString(obj, "executedQty"));
             var cummulative = ToDecimal(GetString(obj, "cummulativeQuoteQty"));
             var avg = executedQty > 0m && cummulative > 0m ? (cummulative / executedQty) : 0m;
@@ -356,11 +431,11 @@ namespace CryptoDayTraderSuite.Exchanges
             return new OrderResult
             {
                 OrderId = orderId,
-                Accepted = !string.IsNullOrWhiteSpace(orderId),
+                Accepted = !string.IsNullOrWhiteSpace(orderId) && !rejected,
                 Filled = string.Equals(status, "FILLED", StringComparison.OrdinalIgnoreCase),
                 FilledQty = executedQty,
                 AvgFillPrice = avg,
-                Message = string.IsNullOrWhiteSpace(status) ? "accepted" : status
+                Message = string.IsNullOrWhiteSpace(status) ? (string.IsNullOrWhiteSpace(orderId) ? "order rejected" : "accepted") : status
             };
         }
 
@@ -380,6 +455,15 @@ namespace CryptoDayTraderSuite.Exchanges
 
             var json = await HttpUtil.SendAsync(req).ConfigureAwait(false);
             var result = UtilCompat.JsonDeserialize<List<Dictionary<string, object>>>(json) ?? new List<Dictionary<string, object>>();
+            if (result.Count == 0)
+            {
+                var errorObj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+                string openOrdersError;
+                if (IsBinanceApiError(errorObj, out openOrdersError))
+                {
+                    throw new InvalidOperationException("Binance open-orders request failed: " + openOrdersError);
+                }
+            }
 
             var list = new List<OpenOrder>();
             foreach (var item in result)
@@ -388,13 +472,31 @@ namespace CryptoDayTraderSuite.Exchanges
                 
                 var orderId = GetString(item, "orderId");
                 var symbol = GetString(item, "symbol");
+                if (string.IsNullOrWhiteSpace(orderId) || string.IsNullOrWhiteSpace(symbol))
+                {
+                    continue;
+                }
                 var side = GetString(item, "side");
+                if (!string.Equals(side, "BUY", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(side, "SELL", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
                 var type = GetString(item, "type");
                 var price = ToDecimal(GetString(item, "price"));
                 var origQty = ToDecimal(GetString(item, "origQty"));
                 var executedQty = ToDecimal(GetString(item, "executedQty"));
-                var status = GetString(item, "status");
+                var status = NormalizeOpenOrderStatus(GetString(item, "status"));
+                if (string.IsNullOrWhiteSpace(status))
+                {
+                    continue;
+                }
+                var created = DateTime.UtcNow;
                 var time = (long)ToDecimal(GetString(item, "time"));
+                if (!TryFromUnixMilliseconds(time, out created))
+                {
+                    continue;
+                }
 
                 list.Add(new OpenOrder
                 {
@@ -406,10 +508,39 @@ namespace CryptoDayTraderSuite.Exchanges
                     Quantity = origQty,
                     FilledQty = executedQty,
                     Status = status,
-                    CreatedUtc = DateTimeOffset.FromUnixTimeMilliseconds(time).UtcDateTime
+                    CreatedUtc = created
                 });
             }
             return list;
+        }
+
+        private static string NormalizeOpenOrderStatus(string rawStatus)
+        {
+            var status = string.IsNullOrWhiteSpace(rawStatus)
+                ? string.Empty
+                : rawStatus.Trim().ToUpperInvariant().Replace("-", "_").Replace(" ", "_");
+
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return string.Empty;
+            }
+
+            if (status.Contains("PARTIAL") && status.Contains("FILL"))
+            {
+                return "PARTIALLY_FILLED";
+            }
+
+            if (status == "NEW" || status == "OPEN" || status == "ACTIVE" || status == "WORKING" || status == "PENDING" || status == "RESTING" || status == "LIVE")
+            {
+                return "OPEN";
+            }
+
+            if (status == "PARTIALLY_FILLED")
+            {
+                return "PARTIALLY_FILLED";
+            }
+
+            return string.Empty;
         }
 
         public async Task<bool> CancelOrderAsync(string orderId)
@@ -433,6 +564,15 @@ namespace CryptoDayTraderSuite.Exchanges
             allReq.Headers.TryAddWithoutValidation("X-MBX-APIKEY", _apiKey);
             var allJson = await HttpUtil.SendAsync(allReq).ConfigureAwait(false);
             var all = UtilCompat.JsonDeserialize<object[]>(allJson);
+            if (all == null)
+            {
+                var errorObj = UtilCompat.JsonDeserialize<Dictionary<string, object>>(allJson);
+                string queryError;
+                if (IsBinanceApiError(errorObj, out queryError))
+                {
+                    return false;
+                }
+            }
 
             string symbol = string.Empty;
             if (all != null)
@@ -597,6 +737,13 @@ namespace CryptoDayTraderSuite.Exchanges
                 return true;
             }
 
+            var errorRoot = UtilCompat.JsonDeserialize<Dictionary<string, object>>(json);
+            string cancelAllError;
+            if (IsBinanceApiError(errorRoot, out cancelAllError))
+            {
+                return false;
+            }
+
             return false;
         }
 
@@ -634,6 +781,40 @@ namespace CryptoDayTraderSuite.Exchanges
                 || string.Equals(status, "EXPIRED", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(status, "EXPIRED_IN_MATCH", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(status, "REJECTED", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsBinanceApiError(Dictionary<string, object> root, out string message)
+        {
+            message = string.Empty;
+            if (root == null)
+            {
+                return false;
+            }
+
+            object codeRaw;
+            if (!root.TryGetValue("code", out codeRaw) || codeRaw == null)
+            {
+                return false;
+            }
+
+            long code;
+            if (!long.TryParse(Convert.ToString(codeRaw, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out code))
+            {
+                return false;
+            }
+
+            if (code == 0)
+            {
+                return false;
+            }
+
+            message = GetString(root, "msg");
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                message = "code=" + code.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return true;
         }
 
         private async Task<Dictionary<string, object>> GetExchangeInfoAsync()
@@ -814,6 +995,25 @@ namespace CryptoDayTraderSuite.Exchanges
             return DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime;
         }
 
+        private bool TryFromUnixMilliseconds(long ms, out DateTime utc)
+        {
+            utc = DateTime.MinValue;
+            if (ms <= 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                utc = DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime;
+                return true;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+        }
+
         private long ToLong(object value)
         {
             if (value == null) return 0L;
@@ -828,6 +1028,17 @@ namespace CryptoDayTraderSuite.Exchanges
             decimal d;
             if (decimal.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out d)) return d;
             return 0m;
+        }
+
+        private bool TryParseDecimal(object value, out decimal parsed)
+        {
+            parsed = 0m;
+            if (value == null)
+            {
+                return false;
+            }
+
+            return decimal.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out parsed);
         }
 
         private string GetString(Dictionary<string, object> obj, string key)

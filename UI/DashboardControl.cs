@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using CryptoDayTraderSuite.Models;
 using CryptoDayTraderSuite.Services;
+using System.Web.Script.Serialization;
 
 using System.Windows.Forms.DataVisualization.Charting;
 using CryptoDayTraderSuite.Themes;
@@ -20,6 +22,19 @@ namespace CryptoDayTraderSuite.UI
         private List<string> _notifications;
         private IAccountService _accountService;
         private IHistoryService _historyService;
+
+        private sealed class DashboardCycleTelemetry
+        {
+            public string RoutingChosenVenues;
+            public string RoutingAlternateVenues;
+            public string RoutingExecutionModes;
+            public int RoutingUnavailableCount;
+            public int PolicyHealthBlockedCount;
+            public int RegimeBlockedCount;
+            public int CircuitBreakerObservedCount;
+            public string MatrixStatus;
+            public string GateStatus;
+        }
 
         // Event to bubble navigation requests up to the main shell
         public event Action<string> NavigationRequest;
@@ -99,6 +114,23 @@ namespace CryptoDayTraderSuite.UI
 
             // Auto mode status
             lblAutoMode.Text = enabled > 0 ? "Auto Mode: Ready" : "Auto Mode: No enabled accounts";
+
+            var telemetry = LoadLatestCycleTelemetry();
+            if (telemetry != null)
+            {
+                var chosen = SummarizeList(telemetry.RoutingChosenVenues, 2);
+                var alternates = SummarizeList(telemetry.RoutingAlternateVenues, 2);
+                var execModes = SummarizeList(telemetry.RoutingExecutionModes, 2);
+                var matrix = string.IsNullOrWhiteSpace(telemetry.MatrixStatus) ? "n/a" : telemetry.MatrixStatus;
+                var gates = string.IsNullOrWhiteSpace(telemetry.GateStatus) ? "n/a" : telemetry.GateStatus;
+
+                lblAutoMode.Text = "Auto Mode: matrix=" + matrix + " gates=" + gates
+                    + " | route=" + chosen + " alt=" + alternates + " exec=" + execModes
+                    + " | venue health policy=" + telemetry.PolicyHealthBlockedCount
+                    + " regime=" + telemetry.RegimeBlockedCount
+                    + " circuit=" + telemetry.CircuitBreakerObservedCount
+                    + " route-unavail=" + telemetry.RoutingUnavailableCount;
+            }
 
             // Performance summary (last 30 days)
             var trades = _historyService != null ? _historyService.LoadTrades() : new List<TradeRecord>();
@@ -186,6 +218,16 @@ namespace CryptoDayTraderSuite.UI
                 if (total == 0) _notifications.Add("No accounts configured.");
                 if (enabled == 0) _notifications.Add("Enable accounts to trade.");
                 if (!_recentTrades.Any()) _notifications.Add("No recent trades.");
+                if (telemetry != null)
+                {
+                    _notifications.Add("Routing rationale: chosen=" + SummarizeList(telemetry.RoutingChosenVenues, 2)
+                        + ", alt=" + SummarizeList(telemetry.RoutingAlternateVenues, 2)
+                        + ", exec=" + SummarizeList(telemetry.RoutingExecutionModes, 2));
+                    _notifications.Add("Venue health counters: policy=" + telemetry.PolicyHealthBlockedCount
+                        + ", regime=" + telemetry.RegimeBlockedCount
+                        + ", circuit=" + telemetry.CircuitBreakerObservedCount
+                        + ", route-unavail=" + telemetry.RoutingUnavailableCount);
+                }
                 lstNotifications.DataSource = _notifications;
 
                 SetFreshness($"Updated {DateTime.Now:HH:mm:ss} · trades(30d): {_recentTrades.Count} · notes: {_notifications.Count}", false, false);
@@ -213,6 +255,48 @@ namespace CryptoDayTraderSuite.UI
             {
                 lblDataFreshness.ForeColor = warn ? Color.DarkOrange : Color.DarkGreen;
             }
+        }
+
+        private DashboardCycleTelemetry LoadLatestCycleTelemetry()
+        {
+            try
+            {
+                var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CryptoDayTraderSuite", "automode", "cycle_reports");
+                if (!Directory.Exists(dir)) return null;
+
+                var latest = new DirectoryInfo(dir)
+                    .GetFiles("cycle_*.json")
+                    .OrderByDescending(f => f.LastWriteTimeUtc)
+                    .FirstOrDefault();
+
+                if (latest == null) return null;
+
+                var json = File.ReadAllText(latest.FullName);
+                var serializer = new JavaScriptSerializer { MaxJsonLength = 16 * 1024 * 1024 };
+                return serializer.Deserialize<DashboardCycleTelemetry>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private string SummarizeList(string csv, int maxItems)
+        {
+            if (string.IsNullOrWhiteSpace(csv)) return "n/a";
+
+            var list = csv.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(v => v == null ? string.Empty : v.Trim())
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (list.Count == 0) return "n/a";
+
+            var head = list.Take(Math.Max(1, maxItems)).ToList();
+            if (list.Count <= head.Count) return string.Join(",", head);
+
+            return string.Join(",", head) + "+" + (list.Count - head.Count);
         }
 
 

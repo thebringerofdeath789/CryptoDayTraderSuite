@@ -11,6 +11,24 @@ function Write-Info([string]$msg) {
     Write-Host ("[B5] " + $msg)
 }
 
+function Resolve-NormalizedAccountId {
+    param([object]$RawId)
+
+    if ($null -eq $RawId) { return "" }
+
+    $text = [string]$RawId
+    if ([string]::IsNullOrWhiteSpace($text)) { return "" }
+
+    $trimmed = $text.Trim()
+    $guidRegex = [regex]'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+    $match = $guidRegex.Match($trimmed)
+    if ($match.Success) {
+        return $match.Value.ToLowerInvariant()
+    }
+
+    return $trimmed
+}
+
 function Get-LatestCycleReport([datetime]$afterUtc) {
     $dir = Join-Path $env:LOCALAPPDATA "CryptoDayTraderSuite\automode\cycle_reports"
     if (-not (Test-Path $dir)) { return $null }
@@ -21,6 +39,26 @@ function Get-LatestCycleReport([datetime]$afterUtc) {
         Select-Object -First 1
 
     return $candidate
+}
+
+function Wait-ForCycleReport {
+    param(
+        [datetime]$AfterUtc,
+        [int]$TimeoutSeconds,
+        [int]$PollSeconds = 5
+    )
+
+    $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(1, $TimeoutSeconds))
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $report = Get-LatestCycleReport -afterUtc $AfterUtc
+        if ($null -ne $report) {
+            return $report
+        }
+
+        Start-Sleep -Seconds ([Math]::Max(1, $PollSeconds))
+    }
+
+    return $null
 }
 
 Set-Location $ProjectRoot
@@ -39,7 +77,20 @@ if (-not (Test-Path $accountsPath)) {
 }
 
 $accountsRaw = Get-Content -Path $accountsPath -Raw
-$accounts = @($accountsRaw | ConvertFrom-Json)
+$accountsParsed = $accountsRaw | ConvertFrom-Json
+$accounts = New-Object System.Collections.Generic.List[object]
+if ($null -ne $accountsParsed) {
+    if ($accountsParsed -is [System.Collections.IEnumerable] -and -not ($accountsParsed -is [string])) {
+        foreach ($entry in $accountsParsed) {
+            if ($null -ne $entry) {
+                [void]$accounts.Add($entry)
+            }
+        }
+    }
+    else {
+        [void]$accounts.Add($accountsParsed)
+    }
+}
 if ($accounts.Count -eq 0) {
     throw "No accounts found in $accountsPath. Create at least one account before running B5 scenario."
 }
@@ -50,6 +101,19 @@ $primaryAccount = if ($paperPreferred.Count -gt 0) { $paperPreferred[0] } elseif
 
 if (-not $primaryAccount.Id) {
     throw "Selected account has no Id in accounts.json"
+}
+
+$availableAccountIds = @($accounts |
+    ForEach-Object { Resolve-NormalizedAccountId -RawId $_.Id } |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
+$primaryAccountId = Resolve-NormalizedAccountId -RawId $primaryAccount.Id
+if ([string]::IsNullOrWhiteSpace($primaryAccountId)) {
+    throw "Selected account id is empty/invalid after normalization."
+}
+
+if (-not ($availableAccountIds -contains $primaryAccountId)) {
+    throw "Normalized primary account id '$primaryAccountId' does not match any account id from accounts.json."
 }
 
 if (Test-Path $profilesPath) {
@@ -63,6 +127,18 @@ $selected15 = @(
     "ADA-USD", "AVAX-USD", "LINK-USD", "LTC-USD", "BCH-USD",
     "DOT-USD", "ATOM-USD", "UNI-USD", "MATIC-USD", "AAVE-USD"
 )
+
+$minimumDeterministicSoakSeconds = 240
+if ($SoakSeconds -lt $minimumDeterministicSoakSeconds) {
+    Write-Info "Requested SoakSeconds=$SoakSeconds is below deterministic B5 minimum ($minimumDeterministicSoakSeconds). Bumping to $minimumDeterministicSoakSeconds seconds."
+    $SoakSeconds = $minimumDeterministicSoakSeconds
+}
+
+$minimumDeterministicMaxSymbols = 15
+if ($MaxSymbols -lt $minimumDeterministicMaxSymbols) {
+    Write-Info "Requested MaxSymbols=$MaxSymbols is below deterministic B5 minimum ($minimumDeterministicMaxSymbols). Bumping to $minimumDeterministicMaxSymbols symbols."
+    $MaxSymbols = $minimumDeterministicMaxSymbols
+}
 
 $assemblyPath = Join-Path $ProjectRoot "bin\Debug\CryptoDayTraderSuite.exe"
 if (-not (Test-Path $assemblyPath)) {
@@ -104,15 +180,15 @@ function New-B5Profile {
     return $profile
 }
 
-[void]$scenarioProfiles.Add((New-B5Profile -ProfileId "b5_selected_3" -Name "B5 Selected 3" -AccountId ([string]$primaryAccount.Id) -PairScope "Selected" -SelectedPairs $selected3 -IntervalMinutes 1 -MaxTradesPerCycle 1 -CooldownMinutes 15 -DailyRiskStopPct 1.5))
-[void]$scenarioProfiles.Add((New-B5Profile -ProfileId "b5_all_scope" -Name "B5 All Scope" -AccountId ([string]$primaryAccount.Id) -PairScope "All" -SelectedPairs @() -IntervalMinutes 1 -MaxTradesPerCycle 2 -CooldownMinutes 20 -DailyRiskStopPct 2.0))
-[void]$scenarioProfiles.Add((New-B5Profile -ProfileId "b5_selected_15" -Name "B5 Selected 15" -AccountId ([string]$primaryAccount.Id) -PairScope "Selected" -SelectedPairs $selected15 -IntervalMinutes 1 -MaxTradesPerCycle 3 -CooldownMinutes 30 -DailyRiskStopPct 3.0))
-[void]$scenarioProfiles.Add((New-B5Profile -ProfileId "b5_failure_probe" -Name "B5 Failure Probe" -AccountId "missing-account-for-isolation" -PairScope "All" -SelectedPairs @() -IntervalMinutes 1 -MaxTradesPerCycle 4 -CooldownMinutes 45 -DailyRiskStopPct 4.0))
+[void]$scenarioProfiles.Add((New-B5Profile -ProfileId "b5_selected_3" -Name "B5 Selected 3" -AccountId $primaryAccountId -PairScope "Selected" -SelectedPairs $selected3 -IntervalMinutes 1 -MaxTradesPerCycle 1 -CooldownMinutes 15 -DailyRiskStopPct 1.5))
+[void]$scenarioProfiles.Add((New-B5Profile -ProfileId "b5_all_scope" -Name "B5 All Scope" -AccountId $primaryAccountId -PairScope "All" -SelectedPairs @() -IntervalMinutes 1 -MaxTradesPerCycle 2 -CooldownMinutes 20 -DailyRiskStopPct 2.0))
+[void]$scenarioProfiles.Add((New-B5Profile -ProfileId "b5_selected_15" -Name "B5 Selected 15" -AccountId $primaryAccountId -PairScope "Selected" -SelectedPairs $selected15 -IntervalMinutes 1 -MaxTradesPerCycle 3 -CooldownMinutes 30 -DailyRiskStopPct 3.0))
+[void]$scenarioProfiles.Add((New-B5Profile -ProfileId "b5_failure_probe" -Name "B5 Failure Probe" -AccountId "missing-account-for-isolation" -PairScope "Selected" -SelectedPairs @("BTC-USD") -IntervalMinutes 1 -MaxTradesPerCycle 4 -CooldownMinutes 45 -DailyRiskStopPct 4.0))
 
 $profileService = New-Object CryptoDayTraderSuite.Services.AutoModeProfileService
 $profileService.ReplaceAll($scenarioProfiles)
 $seededCount = @($profileService.GetAll()).Count
-Write-Info "Seeded B5 profiles via AutoModeProfileService: count=$seededCount, account='$($primaryAccount.Id)'"
+Write-Info "Seeded B5 profiles via AutoModeProfileService: count=$seededCount, account='$primaryAccountId'"
 
 $settingsTypeName = "CryptoDayTraderSuite.Properties.Settings"
 $settingsType = [AppDomain]::CurrentDomain.GetAssemblies() |
@@ -157,13 +233,20 @@ $env:CDTS_AI_PROVIDER = "auto"
 $env:CDTS_AI_MODEL = "auto"
 $env:CDTS_AI_PROPOSER_MODE = "enabled"
 $env:CDTS_AUTOMODE_MAX_SYMBOLS = [string]$MaxSymbols
+$env:CDTS_ROUTING_DIAGNOSTICS_DISABLED = "1"
 
 $exePath = $assemblyPath
 
 $beforeUtc = (Get-Date).ToUniversalTime()
 Write-Info "Launching app for soak run: $SoakSeconds seconds"
 $p = Start-Process -FilePath $exePath -PassThru
-Start-Sleep -Seconds $SoakSeconds
+
+$report = Wait-ForCycleReport -AfterUtc $beforeUtc -TimeoutSeconds $SoakSeconds -PollSeconds 5
+if ($null -eq $report) {
+    $graceSeconds = 120
+    Write-Info "No cycle report observed within soak window; waiting an additional grace period ($graceSeconds s)."
+    $report = Wait-ForCycleReport -AfterUtc $beforeUtc -TimeoutSeconds $graceSeconds -PollSeconds 5
+}
 
 if ($p -and -not $p.HasExited) {
     try { $null = $p.CloseMainWindow() } catch {}
@@ -174,7 +257,6 @@ if ($p -and -not $p.HasExited) {
 }
 
 Start-Sleep -Seconds 1
-$report = Get-LatestCycleReport -afterUtc $beforeUtc
 if ($null -eq $report) {
     throw "No cycle report found after soak run. Ensure Auto Run is enabled at least once in UI."
 }

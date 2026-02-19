@@ -161,10 +161,10 @@ namespace CryptoDayTraderSuite.Brokers
 
         private async Task<(bool ok, string message)> PlaceWithClientAsync(CoinbaseExchangeClient client, OrderRequest order)
         {
-            var result = await client.PlaceOrderAsync(order);
-            if (result == null) return (false, BuildFailureMessage("place", null, "empty order result"));
-            if (!result.Accepted) return (false, BuildFailureMessage("rejected", result.Message, "order rejected"));
-            return (true, BuildSuccessMessage("accepted", "order=" + (result.OrderId ?? "(unknown)")));
+            var result = await client.PlaceOrderAsync(order).ConfigureAwait(false);
+            if (result == null) return (false, BuildFailureMessage("place-response", null, "empty order result"));
+            if (!result.Accepted) return (false, BuildFailureMessage("place-rejected", result.Message, "order rejected"));
+            return (true, BuildSuccessMessage("place-accepted", "order=" + (result.OrderId ?? "(unknown)")));
         }
 
         private string UnprotectOrRaw(string value)
@@ -177,25 +177,40 @@ namespace CryptoDayTraderSuite.Brokers
 
         private CoinbaseExchangeClient CreateClient(string accountId)
         {
+            var hasAccountScope = !string.IsNullOrWhiteSpace(accountId);
             var account = !string.IsNullOrWhiteSpace(accountId)
                 ? _accountService.Get(accountId)
                 : null;
+            if (hasAccountScope && account == null)
+            {
+                throw new InvalidOperationException("coinbase account not found for requested account id");
+            }
+            if (account != null && !account.Enabled)
+            {
+                throw new InvalidOperationException("coinbase account is disabled");
+            }
 
             var keyId = account != null ? account.KeyEntryId : null;
+            if (hasAccountScope && string.IsNullOrWhiteSpace(keyId))
+            {
+                throw new InvalidOperationException("coinbase account has no bound key entry");
+            }
             if (string.IsNullOrWhiteSpace(keyId)) keyId = _keyService.GetActiveId(Service);
             if (string.IsNullOrWhiteSpace(keyId)) keyId = _keyService.GetActiveId("coinbase-exchange");
             if (string.IsNullOrWhiteSpace(keyId)) throw new InvalidOperationException("no active coinbase-advanced key selected");
 
             var keyEntry = _keyService.Get(keyId);
             if (keyEntry == null) throw new InvalidOperationException("coinbase-advanced key not found");
+            if (!keyEntry.Enabled) throw new InvalidOperationException("coinbase-advanced key is disabled");
 
-            var apiKey = UnprotectOrRaw(!string.IsNullOrEmpty(keyEntry.ApiKey) ? keyEntry.ApiKey : keyEntry.Data["ApiKey"]);
-            var apiSecret = UnprotectOrRaw(!string.IsNullOrEmpty(keyEntry.ApiSecretBase64)
+            var apiKey = UnprotectOrRaw(ReadKeyField(keyEntry, keyEntry.ApiKey, "ApiKey"));
+            var apiSecretBase = !string.IsNullOrEmpty(keyEntry.ApiSecretBase64)
                 ? keyEntry.ApiSecretBase64
-                : (!string.IsNullOrEmpty(keyEntry.Secret) ? keyEntry.Secret : keyEntry.Data["ApiSecretBase64"]));
-            var passphrase = UnprotectOrRaw(!string.IsNullOrEmpty(keyEntry.Passphrase) ? keyEntry.Passphrase : keyEntry.Data["Passphrase"]);
-            var apiKeyName = !string.IsNullOrEmpty(keyEntry.ApiKeyName) ? keyEntry.ApiKeyName : keyEntry.Data["ApiKeyName"];
-            var ecPrivateKeyPem = UnprotectOrRaw(!string.IsNullOrEmpty(keyEntry.ECPrivateKeyPem) ? keyEntry.ECPrivateKeyPem : keyEntry.Data["ECPrivateKeyPem"]);
+                : (!string.IsNullOrEmpty(keyEntry.Secret) ? keyEntry.Secret : ReadKeyField(keyEntry, null, "ApiSecretBase64"));
+            var apiSecret = UnprotectOrRaw(apiSecretBase);
+            var passphrase = UnprotectOrRaw(ReadKeyField(keyEntry, keyEntry.Passphrase, "Passphrase"));
+            var apiKeyName = ReadKeyField(keyEntry, keyEntry.ApiKeyName, "ApiKeyName");
+            var ecPrivateKeyPem = UnprotectOrRaw(ReadKeyField(keyEntry, keyEntry.ECPrivateKeyPem, "ECPrivateKeyPem"));
 
             CoinbaseCredentialNormalizer.NormalizeCoinbaseAdvancedInputs(ref apiKey, ref apiSecret, ref apiKeyName, ref ecPrivateKeyPem);
             if (string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(apiKeyName)) apiKey = apiKeyName;
@@ -212,7 +227,7 @@ namespace CryptoDayTraderSuite.Brokers
             try
             {
                 var cli = CreateClient(null);
-                var openOrders = await cli.GetOpenOrdersAsync();
+                var openOrders = await cli.GetOpenOrdersAsync().ConfigureAwait(false);
                 if (openOrders == null) return (false, BuildFailureMessage("cancel", null, "failed to fetch open orders"));
 
                 var normalizedSymbol = NormalizeCoinbaseSymbol(symbol);
@@ -254,10 +269,10 @@ namespace CryptoDayTraderSuite.Brokers
 
                 if (failed > 0)
                 {
-                    return (false, BuildFailureMessage("cancel", "scope=" + scope + " attempted=" + attempted + " canceled=" + canceled + " failed=" + failed, "cancel-all partial failure"));
+                    return (false, BuildFailureMessage("cancel-partial", "scope=" + scope + " attempted=" + attempted + " canceled=" + canceled + " failed=" + failed, "cancel-all partial failure"));
                 }
 
-                return (true, BuildSuccessMessage("canceled", "scope=" + scope + " canceled=" + canceled));
+                return (true, BuildSuccessMessage("cancel-complete", "scope=" + scope + " canceled=" + canceled));
             }
             catch (Exception ex)
             {
@@ -287,6 +302,27 @@ namespace CryptoDayTraderSuite.Brokers
                 .Replace("/", "-")
                 .Replace("_", "-")
                 .ToUpperInvariant();
+        }
+
+        private string ReadKeyField(KeyInfo keyEntry, string preferredValue, string fieldName)
+        {
+            if (!string.IsNullOrWhiteSpace(preferredValue))
+            {
+                return preferredValue;
+            }
+
+            if (keyEntry == null || keyEntry.Data == null || string.IsNullOrWhiteSpace(fieldName))
+            {
+                return string.Empty;
+            }
+
+            string value;
+            if (keyEntry.Data.TryGetValue(fieldName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            return string.Empty;
         }
 
     }

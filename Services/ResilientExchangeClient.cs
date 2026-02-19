@@ -54,6 +54,19 @@ namespace CryptoDayTraderSuite.Services
 
         public async Task<OrderResult> PlaceOrderAsync(OrderRequest order)
         {
+            if (GeoBlockRegistry.IsDisabled(_serviceKey))
+            {
+                return new OrderResult
+                {
+                    OrderId = string.Empty,
+                    Accepted = false,
+                    Filled = false,
+                    FilledQty = 0m,
+                    AvgFillPrice = 0m,
+                    Message = "service-disabled: " + GeoBlockRegistry.GetDisableReason(_serviceKey)
+                };
+            }
+
             try
             {
                 return await _inner.PlaceOrderAsync(order).ConfigureAwait(false);
@@ -98,6 +111,11 @@ namespace CryptoDayTraderSuite.Services
             int attempt = 0;
             while (true)
             {
+                if (GeoBlockRegistry.IsDisabled(_serviceKey))
+                {
+                    return CreateGeoDisabledResult<T>();
+                }
+
                 try
                 {
                     attempt++;

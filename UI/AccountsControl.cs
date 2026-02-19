@@ -22,10 +22,45 @@ namespace CryptoDayTraderSuite.UI
         private AccountBuyingPowerService _accountBuyingPowerService;
         private BindingSource _holdingsBinding = new BindingSource();
 
+        private bool _insightsOnlyMode;
+        private bool _wiringInitialized;
+        private ComboBox _cmbInsightsAccount;
+        private Label _lblInsightsAccount;
+        private TabControl _insightsTabs;
+        private TextBox _txtInsightsOverview;
+        private DataGridView _gridTradeHistory;
+        private DataGridView _gridStrategyStats;
+        private DataGridView _gridBestTrades;
+        private Label _lblProfitability;
+        private Label _lblWinLoss;
+
         private sealed class HoldingViewRow
         {
             public string Currency { get; set; }
             public decimal Amount { get; set; }
+        }
+
+        private sealed class TradeHistoryRow
+        {
+            public DateTime AtUtc { get; set; }
+            public string Exchange { get; set; }
+            public string ProductId { get; set; }
+            public string Strategy { get; set; }
+            public string Side { get; set; }
+            public decimal Quantity { get; set; }
+            public decimal? FillPrice { get; set; }
+            public decimal? PnL { get; set; }
+        }
+
+        private sealed class StrategyStatsRow
+        {
+            public string Strategy { get; set; }
+            public int Trades { get; set; }
+            public int Wins { get; set; }
+            public int Losses { get; set; }
+            public decimal WinRatePct { get; set; }
+            public decimal NetPnl { get; set; }
+            public decimal AvgPnl { get; set; }
         }
 
         public AccountsControl()
@@ -55,18 +90,25 @@ namespace CryptoDayTraderSuite.UI
 
         public void SetInsightsOnlyMode(bool insightsOnly)
         {
+            _insightsOnlyMode = insightsOnly;
+
             if (btnAdd != null) btnAdd.Visible = !insightsOnly;
             if (btnEdit != null) btnEdit.Visible = !insightsOnly;
             if (btnDelete != null) btnDelete.Visible = !insightsOnly;
             if (btnSave != null) btnSave.Visible = !insightsOnly;
             if (btnRefresh != null) btnRefresh.Visible = !insightsOnly;
+
+            if (insightsOnly)
+            {
+                EnsureInsightsOnlyLayout();
+                _ = RefreshSelectedAccountInsightsAsync();
+            }
         }
 
         private void ConfigureGrid()
         {
             gridAccounts.AutoGenerateColumns = false;
-            
-            // Map columns to properties on AccountProfile
+
             colLabel.DataPropertyName = "Label";
             colService.DataPropertyName = "Service";
             colMode.DataPropertyName = "Mode";
@@ -75,7 +117,6 @@ namespace CryptoDayTraderSuite.UI
             colKeyId.DataPropertyName = "KeyEntryId";
             colEnabled.DataPropertyName = "Enabled";
 
-            // Allow editing only for checkboxes
             gridAccounts.ReadOnly = false;
             foreach (DataGridViewColumn col in gridAccounts.Columns)
             {
@@ -113,6 +154,9 @@ namespace CryptoDayTraderSuite.UI
 
         private void WireEvents()
         {
+            if (_wiringInitialized) return;
+            _wiringInitialized = true;
+
             btnAdd.Click += (s, e) => AddAccount();
             btnEdit.Click += (s, e) => EditSelected();
             btnDelete.Click += (s, e) => DeleteSelected();
@@ -123,7 +167,13 @@ namespace CryptoDayTraderSuite.UI
 
             gridAccounts.DoubleClick += (s, e) => EditSelected();
             gridAccounts.CurrentCellDirtyStateChanged += GridAccounts_CurrentCellDirtyStateChanged;
-            gridAccounts.SelectionChanged += async (s, e) => await RefreshSelectedAccountInsightsAsync();
+            gridAccounts.SelectionChanged += async (s, e) =>
+            {
+                if (!_insightsOnlyMode)
+                {
+                    await RefreshSelectedAccountInsightsAsync();
+                }
+            };
         }
 
         private void GridAccounts_CurrentCellDirtyStateChanged(object sender, EventArgs e)
@@ -139,21 +189,32 @@ namespace CryptoDayTraderSuite.UI
             if (_service == null) return;
             var accountInfos = _service.GetAll();
             var profiles = accountInfos.Select(info => (AccountProfile)info).ToList();
-            
-            // Use SortableBindingList to support column sorting
+
             _bs.DataSource = new SortableBindingList<AccountProfile>(profiles);
             gridAccounts.DataSource = _bs;
+
+            if (_insightsOnlyMode)
+            {
+                EnsureInsightsOnlyLayout();
+                PopulateInsightsPicker(profiles);
+            }
+
             _ = RefreshSelectedAccountInsightsAsync();
         }
 
         private AccountProfile Selected()
         {
+            if (_insightsOnlyMode && _cmbInsightsAccount != null)
+            {
+                return _cmbInsightsAccount.SelectedItem as AccountProfile;
+            }
+
             return gridAccounts.CurrentRow != null ? gridAccounts.CurrentRow.DataBoundItem as AccountProfile : null;
         }
 
         private void AddAccount()
         {
-             if (_service == null) return;
+            if (_service == null) return;
             var dlg = new AccountEditDialog(null, _service, _keyService);
             if (dlg.ShowDialog(this) == DialogResult.OK)
                 LoadData();
@@ -164,7 +225,7 @@ namespace CryptoDayTraderSuite.UI
             if (_service == null) return;
             var cur = Selected();
             if (cur == null) return;
-            
+
             var dlg = new AccountEditDialog(cur.Id, _service, _keyService);
             if (dlg.ShowDialog(this) == DialogResult.OK)
                 LoadData();
@@ -189,7 +250,6 @@ namespace CryptoDayTraderSuite.UI
             var data = _bs.DataSource as SortableBindingList<AccountProfile>;
             if (data == null) return;
 
-            // Convert profiles back to Info (preserves IDs and updates Enabled/formatted fields)
             var accountInfos = data.Select(profile => (AccountInfo)profile).ToList();
             _service.ReplaceAll(accountInfos);
 
@@ -253,8 +313,9 @@ namespace CryptoDayTraderSuite.UI
             var selected = Selected();
             if (selected == null)
             {
-                lblCoinbaseInsightsSummary.Text = "Select an account to view API/account insights.";
+                SetOverviewText("Select an account to view API/account insights.");
                 _holdingsBinding.DataSource = new List<HoldingViewRow>();
+                RefreshPerformanceTabs(new List<TradeRecord>());
                 return;
             }
 
@@ -322,9 +383,362 @@ namespace CryptoDayTraderSuite.UI
                 summaryBuilder.Append(liveSummary);
             }
 
-            lblCoinbaseInsightsSummary.Text = summaryBuilder.Length == 0
+            SetOverviewText(summaryBuilder.Length == 0
                 ? "No insights available for the selected account."
-                : summaryBuilder.ToString();
+                : summaryBuilder.ToString());
+
+            RefreshPerformanceTabs(GetTradesForInsights(selected));
+        }
+
+        private void EnsureInsightsOnlyLayout()
+        {
+            if (mainLayout == null || topPanel == null || pnlCoinbaseInsights == null) return;
+
+            if (gridAccounts != null)
+            {
+                gridAccounts.Visible = false;
+            }
+
+            if (mainLayout.RowStyles.Count >= 3)
+            {
+                mainLayout.RowStyles[1] = new RowStyle(SizeType.Absolute, 0F);
+                mainLayout.RowStyles[2] = new RowStyle(SizeType.Percent, 100F);
+            }
+
+            if (_lblInsightsAccount == null)
+            {
+                _lblInsightsAccount = new Label
+                {
+                    AutoSize = true,
+                    Text = "Account:",
+                    Margin = new Padding(3, 8, 3, 0)
+                };
+            }
+
+            if (_cmbInsightsAccount == null)
+            {
+                _cmbInsightsAccount = new ComboBox
+                {
+                    DropDownStyle = ComboBoxStyle.DropDownList,
+                    Width = 280,
+                    Margin = new Padding(3, 3, 8, 3)
+                };
+                _cmbInsightsAccount.Format += InsightsAccountFormat;
+                _cmbInsightsAccount.SelectedIndexChanged += async (s, e) => await RefreshSelectedAccountInsightsAsync();
+            }
+
+            topPanel.Controls.Clear();
+            topPanel.Controls.Add(_lblInsightsAccount);
+            topPanel.Controls.Add(_cmbInsightsAccount);
+            if (btnRefreshInsights != null)
+            {
+                btnRefreshInsights.Visible = true;
+                btnRefreshInsights.Text = "Refresh Insights";
+                topPanel.Controls.Add(btnRefreshInsights);
+            }
+            if (btnImportCoinbase != null)
+            {
+                btnImportCoinbase.Visible = true;
+                topPanel.Controls.Add(btnImportCoinbase);
+            }
+
+            BuildInsightsTabs();
+        }
+
+        private void BuildInsightsTabs()
+        {
+            if (_insightsTabs != null) return;
+
+            pnlCoinbaseInsights.Controls.Clear();
+            pnlCoinbaseInsights.RowStyles.Clear();
+            pnlCoinbaseInsights.ColumnStyles.Clear();
+            pnlCoinbaseInsights.RowCount = 1;
+            pnlCoinbaseInsights.ColumnCount = 1;
+            pnlCoinbaseInsights.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            pnlCoinbaseInsights.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            _insightsTabs = new TabControl { Dock = DockStyle.Fill };
+
+            var tabOverview = new TabPage("Overview");
+            _txtInsightsOverview = new TextBox
+            {
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                BorderStyle = BorderStyle.None,
+                Dock = DockStyle.Fill
+            };
+            tabOverview.Controls.Add(_txtInsightsOverview);
+
+            var tabHoldings = new TabPage("Holdings");
+            if (gridHoldings.Parent != null)
+            {
+                gridHoldings.Parent.Controls.Remove(gridHoldings);
+            }
+            gridHoldings.Dock = DockStyle.Fill;
+            tabHoldings.Controls.Add(gridHoldings);
+
+            var tabHistory = new TabPage("Trade History");
+            _gridTradeHistory = BuildReadOnlyGrid();
+            _gridTradeHistory.AutoGenerateColumns = false;
+            _gridTradeHistory.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Time (UTC)", DataPropertyName = "AtUtc", FillWeight = 130 });
+            _gridTradeHistory.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Exchange", DataPropertyName = "Exchange", FillWeight = 90 });
+            _gridTradeHistory.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Product", DataPropertyName = "ProductId", FillWeight = 95 });
+            _gridTradeHistory.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Strategy", DataPropertyName = "Strategy", FillWeight = 90 });
+            _gridTradeHistory.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Side", DataPropertyName = "Side", FillWeight = 60 });
+            _gridTradeHistory.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Qty", DataPropertyName = "Quantity", FillWeight = 70 });
+            _gridTradeHistory.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Fill", DataPropertyName = "FillPrice", FillWeight = 75 });
+            _gridTradeHistory.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "PnL", DataPropertyName = "PnL", FillWeight = 70 });
+            tabHistory.Controls.Add(_gridTradeHistory);
+
+            var tabProfitability = new TabPage("Profitability");
+            _lblProfitability = new Label { Dock = DockStyle.Fill, AutoSize = false, Text = "No profitability data.", Padding = new Padding(8) };
+            tabProfitability.Controls.Add(_lblProfitability);
+
+            var tabWinLoss = new TabPage("Win vs Loss");
+            _lblWinLoss = new Label { Dock = DockStyle.Fill, AutoSize = false, Text = "No win/loss data.", Padding = new Padding(8) };
+            tabWinLoss.Controls.Add(_lblWinLoss);
+
+            var tabBestStrategies = new TabPage("Best Strategies");
+            _gridStrategyStats = BuildReadOnlyGrid();
+            _gridStrategyStats.AutoGenerateColumns = false;
+            _gridStrategyStats.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Strategy", DataPropertyName = "Strategy", FillWeight = 120 });
+            _gridStrategyStats.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Trades", DataPropertyName = "Trades", FillWeight = 60 });
+            _gridStrategyStats.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Wins", DataPropertyName = "Wins", FillWeight = 60 });
+            _gridStrategyStats.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Losses", DataPropertyName = "Losses", FillWeight = 60 });
+            _gridStrategyStats.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Win %", DataPropertyName = "WinRatePct", FillWeight = 70 });
+            _gridStrategyStats.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Net PnL", DataPropertyName = "NetPnl", FillWeight = 85 });
+            _gridStrategyStats.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Avg PnL", DataPropertyName = "AvgPnl", FillWeight = 80 });
+            tabBestStrategies.Controls.Add(_gridStrategyStats);
+
+            var tabBestTrades = new TabPage("Best Trades");
+            _gridBestTrades = BuildReadOnlyGrid();
+            _gridBestTrades.AutoGenerateColumns = false;
+            _gridBestTrades.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Time (UTC)", DataPropertyName = "AtUtc", FillWeight = 130 });
+            _gridBestTrades.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Product", DataPropertyName = "ProductId", FillWeight = 100 });
+            _gridBestTrades.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Strategy", DataPropertyName = "Strategy", FillWeight = 90 });
+            _gridBestTrades.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Side", DataPropertyName = "Side", FillWeight = 60 });
+            _gridBestTrades.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "PnL", DataPropertyName = "PnL", FillWeight = 70 });
+            tabBestTrades.Controls.Add(_gridBestTrades);
+
+            _insightsTabs.TabPages.Add(tabOverview);
+            _insightsTabs.TabPages.Add(tabHoldings);
+            _insightsTabs.TabPages.Add(tabHistory);
+            _insightsTabs.TabPages.Add(tabProfitability);
+            _insightsTabs.TabPages.Add(tabWinLoss);
+            _insightsTabs.TabPages.Add(tabBestStrategies);
+            _insightsTabs.TabPages.Add(tabBestTrades);
+
+            pnlCoinbaseInsights.Controls.Add(_insightsTabs, 0, 0);
+        }
+
+        private DataGridView BuildReadOnlyGrid()
+        {
+            var grid = new DataGridView();
+            grid.Dock = DockStyle.Fill;
+            grid.ReadOnly = true;
+            grid.AllowUserToAddRows = false;
+            grid.AllowUserToDeleteRows = false;
+            grid.RowHeadersVisible = false;
+            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            return grid;
+        }
+
+        private void PopulateInsightsPicker(List<AccountProfile> profiles = null)
+        {
+            if (_cmbInsightsAccount == null) return;
+
+            var allProfiles = profiles;
+            if (allProfiles == null)
+            {
+                var source = _bs.DataSource as SortableBindingList<AccountProfile>;
+                allProfiles = source == null ? new List<AccountProfile>() : source.ToList();
+            }
+
+            var selectedId = (_cmbInsightsAccount.SelectedItem as AccountProfile)?.Id;
+            _cmbInsightsAccount.Items.Clear();
+
+            foreach (var profile in allProfiles)
+            {
+                _cmbInsightsAccount.Items.Add(profile);
+            }
+
+            if (_cmbInsightsAccount.Items.Count == 0)
+            {
+                return;
+            }
+
+            var idx = -1;
+            if (!string.IsNullOrWhiteSpace(selectedId))
+            {
+                for (int i = 0; i < _cmbInsightsAccount.Items.Count; i++)
+                {
+                    var item = _cmbInsightsAccount.Items[i] as AccountProfile;
+                    if (item != null && string.Equals(item.Id, selectedId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        idx = i;
+                        break;
+                    }
+                }
+            }
+
+            _cmbInsightsAccount.SelectedIndex = idx >= 0 ? idx : 0;
+        }
+
+        private void InsightsAccountFormat(object sender, ListControlConvertEventArgs e)
+        {
+            var profile = e.ListItem as AccountProfile;
+            if (profile == null) return;
+
+            var label = string.IsNullOrWhiteSpace(profile.Label) ? "(unnamed)" : profile.Label;
+            var service = string.IsNullOrWhiteSpace(profile.Service) ? "(service?)" : profile.Service;
+            e.Value = label + " [" + service + "]";
+        }
+
+        private void SetOverviewText(string text)
+        {
+            if (_txtInsightsOverview != null)
+            {
+                _txtInsightsOverview.Text = text ?? string.Empty;
+                return;
+            }
+
+            lblCoinbaseInsightsSummary.Text = text ?? string.Empty;
+        }
+
+        private List<TradeRecord> GetTradesForInsights(AccountProfile selected)
+        {
+            if (_historyService == null)
+            {
+                return new List<TradeRecord>();
+            }
+
+            var trades = _historyService.LoadTrades() ?? new List<TradeRecord>();
+            if (selected == null)
+            {
+                return trades;
+            }
+
+            var selectedFamily = ToServiceFamily(selected.Service);
+            if (string.IsNullOrWhiteSpace(selectedFamily))
+            {
+                return trades;
+            }
+
+            var filtered = trades.Where(t => string.Equals(ToServiceFamily(t.Exchange), selectedFamily, StringComparison.OrdinalIgnoreCase)).ToList();
+            return filtered.Count > 0 ? filtered : trades;
+        }
+
+        private void RefreshPerformanceTabs(List<TradeRecord> trades)
+        {
+            var safe = trades ?? new List<TradeRecord>();
+            var executed = safe.Where(t => t != null && t.Executed).ToList();
+            var pnlKnown = executed.Where(t => t.PnL.HasValue).ToList();
+
+            if (_gridTradeHistory != null)
+            {
+                var rows = executed
+                    .OrderByDescending(t => t.AtUtc)
+                    .Take(250)
+                    .Select(t => new TradeHistoryRow
+                    {
+                        AtUtc = t.AtUtc,
+                        Exchange = t.Exchange,
+                        ProductId = t.ProductId,
+                        Strategy = t.Strategy,
+                        Side = t.Side,
+                        Quantity = t.Quantity,
+                        FillPrice = t.FillPrice,
+                        PnL = t.PnL
+                    })
+                    .ToList();
+                _gridTradeHistory.DataSource = rows;
+            }
+
+            var wins = pnlKnown.Count(t => t.PnL.GetValueOrDefault() > 0m);
+            var losses = pnlKnown.Count(t => t.PnL.GetValueOrDefault() < 0m);
+            var flat = pnlKnown.Count - wins - losses;
+            var netPnl = pnlKnown.Sum(t => t.PnL.GetValueOrDefault());
+            var avgPnl = pnlKnown.Count > 0 ? netPnl / pnlKnown.Count : 0m;
+            var best = pnlKnown.Count > 0 ? pnlKnown.Max(t => t.PnL.GetValueOrDefault()) : 0m;
+            var worst = pnlKnown.Count > 0 ? pnlKnown.Min(t => t.PnL.GetValueOrDefault()) : 0m;
+            var winRate = pnlKnown.Count > 0 ? (wins * 100m) / pnlKnown.Count : 0m;
+
+            if (_lblProfitability != null)
+            {
+                _lblProfitability.Text =
+                    "Executed trades: " + executed.Count + "\n"
+                    + "PnL-known trades: " + pnlKnown.Count + "\n"
+                    + "Net PnL: " + FormatAmount(netPnl) + "\n"
+                    + "Average PnL: " + FormatAmount(avgPnl) + "\n"
+                    + "Best trade: " + FormatAmount(best) + "\n"
+                    + "Worst trade: " + FormatAmount(worst);
+            }
+
+            if (_lblWinLoss != null)
+            {
+                _lblWinLoss.Text =
+                    "Wins: " + wins + "\n"
+                    + "Losses: " + losses + "\n"
+                    + "Flat: " + flat + "\n"
+                    + "Win Rate: " + winRate.ToString("0.##") + "%";
+            }
+
+            if (_gridStrategyStats != null)
+            {
+                var strategyRows = pnlKnown
+                    .GroupBy(t => string.IsNullOrWhiteSpace(t.Strategy) ? "(unknown)" : t.Strategy)
+                    .Select(g =>
+                    {
+                        var strategyWins = g.Count(x => x.PnL.GetValueOrDefault() > 0m);
+                        var strategyLosses = g.Count(x => x.PnL.GetValueOrDefault() < 0m);
+                        var strategyNet = g.Sum(x => x.PnL.GetValueOrDefault());
+                        return new StrategyStatsRow
+                        {
+                            Strategy = g.Key,
+                            Trades = g.Count(),
+                            Wins = strategyWins,
+                            Losses = strategyLosses,
+                            WinRatePct = g.Count() > 0 ? (strategyWins * 100m) / g.Count() : 0m,
+                            NetPnl = strategyNet,
+                            AvgPnl = g.Count() > 0 ? strategyNet / g.Count() : 0m
+                        };
+                    })
+                    .OrderByDescending(r => r.NetPnl)
+                    .ToList();
+                _gridStrategyStats.DataSource = strategyRows;
+            }
+
+            if (_gridBestTrades != null)
+            {
+                var bestRows = pnlKnown
+                    .OrderByDescending(t => t.PnL.GetValueOrDefault())
+                    .Take(20)
+                    .Select(t => new TradeHistoryRow
+                    {
+                        AtUtc = t.AtUtc,
+                        ProductId = t.ProductId,
+                        Strategy = t.Strategy,
+                        Side = t.Side,
+                        PnL = t.PnL
+                    })
+                    .ToList();
+                _gridBestTrades.DataSource = bestRows;
+            }
+        }
+
+        private string ToServiceFamily(string service)
+        {
+            var s = string.IsNullOrWhiteSpace(service) ? string.Empty : service.Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+            if (s.StartsWith("BINANCE")) return "BINANCE";
+            if (s.StartsWith("COINBASE")) return "COINBASE";
+            if (s.StartsWith("BYBIT")) return "BYBIT";
+            if (s.StartsWith("OKX")) return "OKX";
+            if (s.StartsWith("KRAKEN")) return "KRAKEN";
+            if (s.StartsWith("BITSTAMP")) return "BITSTAMP";
+            return s;
         }
 
         private async Task<string> BuildLiveApiValidationSummaryAsync(AccountProfile selected)

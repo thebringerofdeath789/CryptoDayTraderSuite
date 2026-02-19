@@ -828,3 +828,101 @@
 
 - Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
 - Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_214245.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`.
+
+## Post-Audit Remediation (Iteration 25) - 2026-02-17
+
+### R25 Changes Applied
+
+- Normalized open-order status mapping in `BinanceClient`, `BybitClient`, `OkxClient`, and `KrakenClient` so venue variants collapse into typed open-state values (`OPEN` / `PARTIALLY_FILLED`) and non-open terminal states are excluded.
+- Normalized open-order `productId` filter behavior in `BitstampClient`, `KrakenClient`, and `CoinbaseExchangeClient` by comparing canonicalized symbols (`NormalizeProduct`) instead of raw venue-specific strings.
+- Aligned `CoinbaseExchangeClient` open-order status output to explicit normalized values, with fallback-to-open only when the row is independently recognized as open-like.
+
+### R25 Finding Status Updates
+
+- `BUG-OPS-OPENORDERS-STATUS-DRIFT-001`: **Closed** (open-order status handling is now normalized across major exchange clients).
+- `BUG-OPS-OPENORDERS-FILTER-DRIFT-001`: **Closed** (`GetOpenOrdersAsync(productId)` now uses canonicalized symbol matching in remaining variant clients).
+
+### R25 Verification
+
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260217_225835.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_FAILURE_NAMES=none`.
+
+## Post-Audit Remediation (Iteration 26) - 2026-02-19
+
+### R26 Changes Applied
+
+- Hardened async placement flow in `Brokers/CoinbaseExchangeBroker.cs` by adding `.ConfigureAwait(false)` in `PlaceWithClientAsync(...)` (`await client.PlaceOrderAsync(order).ConfigureAwait(false)`).
+- This removes the remaining broker-side order-placement await without explicit context policy in active non-UI broker paths.
+
+### R26 Finding Status Updates
+
+- `BUG-ASYNC-BROKER-AWAIT-CONSISTENCY-001`: **Closed** (coinbase broker placement helper now matches async context policy used across active brokers).
+
+### R26 Verification
+
+- Touched-file diagnostics: clean (`Brokers/CoinbaseExchangeBroker.cs`).
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification initially failed on freshness-only gates during this iteration while refreshing stale artifacts, then recovered after runtime evidence refresh + profile-binding repair.
+- Latest strict artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260219_050303.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_FAILURE_NAMES=none`, `Freshness: overall=PASS`.
+
+## Post-Audit Remediation (Iteration 27) - 2026-02-19
+
+### R27 Changes Applied
+
+- Retired sync-over-async routing API surface by removing synchronous `Mid(...)` / `Convert(...)` from `Services/IRateRouter.cs` and deleting their wrappers in `Services/RateRouter.cs`.
+- Migrated objective conversion path to async by replacing `Strategy/ObjectiveScorer.cs` `ToObjectiveUnits(...)` with `ToObjectiveUnitsAsync(...)`, now awaiting `router.ConvertAsync(...)` with `.ConfigureAwait(false)`.
+- Resolved transient compile break introduced during migration by adding missing `using System.Threading.Tasks;` in `Strategy/ObjectiveScorer.cs`.
+
+### R27 Finding Status Updates
+
+- `BUG-ASYNC-RATEROUTER-SYNCWRAPPER-001`: **Closed** (rate-router interface/implementation no longer expose sync wrappers over async work).
+- `BUG-ASYNC-OBJECTIVE-CONVERT-001`: **Closed** (objective scoring no longer consumes sync conversion path).
+
+### R27 Verification
+
+- Touched-file diagnostics: clean (`Services/IRateRouter.cs`, `Services/RateRouter.cs`, `Strategy/ObjectiveScorer.cs`).
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260219_050735.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_FAILURE_NAMES=none`.
+
+## Post-Audit Remediation (Iteration 28) - 2026-02-19
+
+### R28 Changes Applied
+
+- Retired remaining sync-over-async surface in `Exchanges/CoinbasePublicClient.cs` by removing legacy synchronous wrappers:
+  - `GetProducts()`
+  - `GetCandles(string productId, int granSeconds, DateTime startUtc, DateTime endUtc)`
+  - `GetTickerMid(string productId)`
+- Removed unused local `tasks` collection in `GetCandlesAsync(...)`.
+- Hardened public ticker numeric parsing by switching to invariant-culture decimal parsing (`NumberStyles.Any`, `CultureInfo.InvariantCulture`) for `bid`, `ask`, and `price`.
+
+### R28 Finding Status Updates
+
+- `BUG-ASYNC-COINBASEPUBLIC-SYNCWRAPPER-001`: **Closed** (no remaining sync wrappers in Coinbase public client).
+- `BUG-PARSER-COINBASEPUBLIC-LOCALE-001`: **Closed** (ticker decimal parsing no longer locale-sensitive).
+
+### R28 Verification
+
+- Touched-file diagnostics: clean (`Exchanges/CoinbasePublicClient.cs`).
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260219_203232.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_FAILURE_NAMES=none`.
+
+## Post-Audit Remediation (Iteration 29) - 2026-02-19
+
+### R29 Changes Applied
+
+- Performed final remediation-phase closure sweep for sync-over-async usage across active runtime code (`.Result`, `GetAwaiter().GetResult()`, blocking `.Wait()` patterns).
+- No additional active runtime sync-over-async wrappers found after prior Iteration 27/28 removals.
+
+### R29 Finding Status Updates
+
+- `PHASE-ASYNC-HARDENING-CLOSEOUT-001`: **Closed** (final sweep confirms no remaining blocking async wrappers in active runtime paths).
+
+### R29 Verification
+
+- Build: `msbuild CryptoDayTraderSuite.csproj /nologo /p:Configuration=Debug /p:OutDir=bin\Debug_Verify\ /t:Build /v:minimal` => **PASS**.
+- Strict certification artifact: `obj/runtime_reports/multiexchange/multi_exchange_cert_20260219_203655.txt` => `VERDICT=PARTIAL`, `STRICT_FAILURE_CLASS=NONE`, `STRICT_FAILURE_COUNT=0`, `STRICT_FAILURE_NAMES=none`.
+
+### Remediation Phase Status
+
+- **Current post-audit async/reliability remediation phase: COMPLETE.**
+- Next phase entry point: continue with the next prioritized hardening slice outside sync-over-async retirement (strategy/runtime reliability backlog).

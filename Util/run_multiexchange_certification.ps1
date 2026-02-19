@@ -145,7 +145,10 @@ function Get-RecentCycleReports {
 }
 
 function Get-BestMatrixCycleReport {
-    param([string]$ReportsDir)
+    param(
+        [string]$ReportsDir,
+        [int]$MaxAgeHours = 24
+    )
 
     if ([string]::IsNullOrWhiteSpace($ReportsDir) -or -not (Test-Path $ReportsDir)) {
         return $null
@@ -155,12 +158,25 @@ function Get-BestMatrixCycleReport {
         Sort-Object LastWriteTimeUtc -Descending |
         Select-Object -First 200)
 
+    $nowUtc = [datetime]::UtcNow
+
     foreach ($candidate in $recent) {
         $data = Try-ReadJson -Path $candidate.FullName
         if ($null -eq $data) { continue }
-        if ([string]::Equals([string]$data.MatrixStatus, "PASS", [System.StringComparison]::OrdinalIgnoreCase)) {
+        if (-not [string]::Equals([string]$data.MatrixStatus, "PASS", [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+
+        $ageHours = [math]::Round(($nowUtc - $candidate.LastWriteTimeUtc).TotalHours, 2)
+        if ($ageHours -le [double]$MaxAgeHours) {
             return [pscustomobject]@{ File = $candidate; Data = $data }
         }
+    }
+
+    foreach ($candidate in $recent) {
+        $data = Try-ReadJson -Path $candidate.FullName
+        if ($null -eq $data) { continue }
+        return [pscustomobject]@{ File = $candidate; Data = $data }
     }
 
     if ($recent.Count -gt 0) {
@@ -1444,7 +1460,7 @@ try {
         Add-CheckResult -List $checks -Result (New-CheckResult -Name "Build" -Status "FAIL" -Detail $detail)
     }
 
-    $matrixCyclePick = Get-BestMatrixCycleReport -ReportsDir $AutoModeReportsDir
+    $matrixCyclePick = Get-BestMatrixCycleReport -ReportsDir $AutoModeReportsDir -MaxAgeHours $MaxMatrixArtifactAgeHours
     $latestCycle = if ($null -ne $matrixCyclePick) { $matrixCyclePick.File } else { $null }
     $cycleData = if ($null -ne $matrixCyclePick) { $matrixCyclePick.Data } else { $null }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using CryptoDayTraderSuite.Util;
 
 namespace CryptoDayTraderSuite.Exchanges
@@ -30,7 +31,6 @@ namespace CryptoDayTraderSuite.Exchanges
             var outRows = new List<CandleRow>();
             var step = TimeSpan.FromSeconds(granSeconds * 300);
             var t = startUtc;
-            var tasks = new List<System.Threading.Tasks.Task<string>>();
             
             // Batching creates improved performance but we must limit concurrency to avoid 429s (10 req/sec)
             // For simplicity in this async refactor, we serialize the chunks but asyncly.
@@ -78,9 +78,9 @@ namespace CryptoDayTraderSuite.Exchanges
                 var t = UtilCompat.JsonDeserialize<Ticker>(json);
                 if (t == null) return 0m;
                 decimal bid = 0m, ask = 0m, price = 0m;
-                decimal.TryParse(t.bid ?? "0", out bid);
-                decimal.TryParse(t.ask ?? "0", out ask);
-                decimal.TryParse(t.price ?? "0", out price);
+                decimal.TryParse(t.bid ?? "0", NumberStyles.Any, CultureInfo.InvariantCulture, out bid);
+                decimal.TryParse(t.ask ?? "0", NumberStyles.Any, CultureInfo.InvariantCulture, out ask);
+                decimal.TryParse(t.price ?? "0", NumberStyles.Any, CultureInfo.InvariantCulture, out price);
                 if (bid > 0m && ask > 0m) return (bid + ask) / 2m;
                 return price;
             }
@@ -90,11 +90,6 @@ namespace CryptoDayTraderSuite.Exchanges
                 return 0m;
             }
         }
-
-        // Legacy synchronous methods kept for compilation until full migration, forwarding to async-wait
-        public List<string> GetProducts() => GetProductsAsync().Result;
-        public List<CandleRow> GetCandles(string productId, int granSeconds, DateTime startUtc, DateTime endUtc) => GetCandlesAsync(productId, granSeconds, startUtc, endUtc).Result;
-        public decimal GetTickerMid(string productId) => GetTickerMidAsync(productId).Result;
 
 
         private class Product { public string id { get; set; } }

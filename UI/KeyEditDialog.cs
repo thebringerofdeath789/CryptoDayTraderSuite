@@ -58,7 +58,7 @@ namespace CryptoDayTraderSuite.UI
             tl.Controls.Add(cmbService, 1, 0);
             if (cmbService.Items.Count > 0) cmbService.SelectedIndex = 0;
 
-            tl.Controls.Add(new Label { Text = "Routing Hint", AutoSize = true, Margin = new Padding(0,8,8,8) }, 0, 1);
+            tl.Controls.Add(new Label { Text = "Template / Routing", AutoSize = true, Margin = new Padding(0,8,8,8) }, 0, 1);
             lblRoutingHint = new Label { AutoSize = true, Margin = new Padding(3, 8, 3, 8), ForeColor = System.Drawing.SystemColors.GrayText };
             tl.Controls.Add(lblRoutingHint, 1, 1);
 
@@ -159,7 +159,11 @@ namespace CryptoDayTraderSuite.UI
             var policy = ExchangeCredentialPolicy.ForService(selectedService);
             if (!HasRequiredCredentialInputs(policy))
             {
-                MessageBox.Show("Missing required credentials for " + selectedService + ". Required: " + policy.RequiredSummary + ".", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    "Missing required credentials for " + selectedService + ". Required: " + policy.RequiredSummary + ". Template: " + policy.TemplateSummary + ".",
+                    "Validation",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return;
             }
 
@@ -286,8 +290,20 @@ namespace CryptoDayTraderSuite.UI
 
             if (lblRoutingHint != null)
             {
-                lblRoutingHint.Text = GetGeoRoutingHint(service);
+                lblRoutingHint.Text = BuildTemplateAndRoutingHint(service);
             }
+        }
+
+        private string BuildTemplateAndRoutingHint(string service)
+        {
+            var policy = ExchangeCredentialPolicy.ForService(service);
+            var routing = GetGeoRoutingHint(service);
+            if (string.IsNullOrWhiteSpace(routing))
+            {
+                return "Required: " + policy.RequiredSummary + " | Template: " + policy.TemplateSummary;
+            }
+
+            return "Required: " + policy.RequiredSummary + " | Template: " + policy.TemplateSummary + " | " + routing;
         }
 
         private void ImportCoinbaseJsonFromFile()
